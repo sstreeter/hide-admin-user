@@ -26,7 +26,7 @@ user_name_exists() {
 }
  
 #=======================================================================
-# requirements: unverified uid parameter	
+# requirements: unverified uid parameter    
 # purpose: checks if uid argument has already been issued.
 uid_exists() {
     echo -e "$currentDate: + [Enter] function call: \"uid_exists\" +" 2>&1 | tee >> "$scriptLog";
@@ -85,7 +85,7 @@ validate_user() {
     # check that script is run as root
     if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$scriptLog"; exit 1; return; fi
     
-	# check if offset is valid
+    # check if offset is valid
     if [[ "$offset" -lt 0 ]] || [[ "$offset" -gt "$range_500" ]]; then 
     echo -e "${RED}-- Offset value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$scriptLog"
     echo -e "Please change to a value less than $range_500, preferably 200 or less and greater than zero." 2>&1 | tee >> "$scriptLog" exit 1; return; fi
@@ -165,129 +165,129 @@ if [[ "$unadjusted_uid" -ge $(( range_500 + offset)) ]]; then echo -e "upper_bou
 # purpose: returns an $adjusted_uid candidate value
 find_adjusted_uid() {
     echo -e "$currentDate: + [Enter] function call: \"find_adjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
-	# vars #
-	local adjusted_uid
-	local index
-	local original_uid
-	local uid_conflict
-	local uid_range
-	
-	original_uid=$unadjusted_uid
-	index=0
-	uid_conflict="Yes"
-	
-	uid_range="$( find_uid_range )"
-	
-	case "$uid_range" in
+    # vars #
+    local adjusted_uid
+    local index
+    local original_uid
+    local uid_conflict
+    local uid_range
+    
+    original_uid=$unadjusted_uid
+    index=0
+    uid_conflict="Yes"
+    
+    uid_range="$( find_uid_range )"
+    
+    case "$uid_range" in
 
-	# range (b), # range (a) - do nothing
-	"negative_offset" | "lower_boundary" )
-		echo -e "$currentDate: ++ UID: \"$unadjusted_uid\" is already decremented below 500 ++" 2>&1 | tee >> "$scriptLog"
-		echo "$unadjusted_uid"; return
-		;;
-	# range (c) - 1/2 cases that should be migrated
-	"positive_offset" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" needs to be decremented to a valid id below 500  -+" 2>&1 | tee >> "$scriptLog"
-		;;
-	# range (d) - 2/2 cases that should be migrated
-	"upper_boundary" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" needs to be decremented to a valid id below 500  -+" 2>&1 | tee >> "$scriptLog"
-		# reset uid starting point by convention. 
-		original_uid=$(( range_500 + 1 ))
-		;;
-	# range (undefined) - do nothing
-	"undefined" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" is \"undefined\" -+" 2>&1 | tee >> "$scriptLog"; echo "-1"; return
-		;;
-	* )
-		# this condition should never be triggered and is only here for complete coverage
-		echo -e "$currentDate: -- This is an un-handled condition --" 2>&1 | tee >> "$scriptLog"; echo ""; return
-	esac
-	
-	# best guess offset for the adjusted_uid under the assumption that the UID is exactly displaced by an offset of 100.
-	adjusted_uid=$(( original_uid - offset ))
-	while [[ "$uid_conflict" = "Yes" ]] && [[ "$index" -lt "$offset" ]]
-	do
-		# check to see if uid conflicts with a uid that is in use.
-		uid_conflict=$( uid_exists "$adjusted_uid" )
-		
-		# if not ( uid_conflict="No" ), then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid.
-		if [[ "$uid_conflict" != "Yes" ]]; then
-		echo -e "$currentDate: + Found valid adjusted UID: \"$adjusted_uid\" +" 2>&1 | tee >> "$scriptLog"
-		echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog"
-		echo -e "$adjusted_uid"
-		return
-		fi
-		
-		# if so ( uid_conflict="Yes" ), increment adjusted_uid and try again on next loop
-		(( adjusted_uid++ ));
-		(( index++ ))
-	done
+    # range (b), # range (a) - do nothing
+    "negative_offset" | "lower_boundary" )
+        echo -e "$currentDate: ++ UID: \"$unadjusted_uid\" is already decremented below 500 ++" 2>&1 | tee >> "$scriptLog"
+        echo "$unadjusted_uid"; return
+        ;;
+    # range (c) - 1/2 cases that should be migrated
+    "positive_offset" )
+        echo -e "$currentDate: +- UID: \"$unadjusted_uid\" needs to be decremented to a valid id below 500  -+" 2>&1 | tee >> "$scriptLog"
+        ;;
+    # range (d) - 2/2 cases that should be migrated
+    "upper_boundary" )
+        echo -e "$currentDate: +- UID: \"$unadjusted_uid\" needs to be decremented to a valid id below 500  -+" 2>&1 | tee >> "$scriptLog"
+        # reset uid starting point by convention. 
+        original_uid=$(( range_500 + 1 ))
+        ;;
+    # range (undefined) - do nothing
+    "undefined" )
+        echo -e "$currentDate: +- UID: \"$unadjusted_uid\" is \"undefined\" -+" 2>&1 | tee >> "$scriptLog"; echo "-1"; return
+        ;;
+    * )
+        # this condition should never be triggered and is only here for complete coverage
+        echo -e "$currentDate: -- This is an un-handled condition --" 2>&1 | tee >> "$scriptLog"; echo ""; return
+    esac
+    
+    # best guess offset for the adjusted_uid under the assumption that the UID is exactly displaced by an offset of 100.
+    adjusted_uid=$(( original_uid - offset ))
+    while [[ "$uid_conflict" = "Yes" ]] && [[ "$index" -lt "$offset" ]]
+    do
+        # check to see if uid conflicts with a uid that is in use.
+        uid_conflict=$( uid_exists "$adjusted_uid" )
+        
+        # if not ( uid_conflict="No" ), then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid.
+        if [[ "$uid_conflict" != "Yes" ]]; then
+        echo -e "$currentDate: + Found valid adjusted UID: \"$adjusted_uid\" +" 2>&1 | tee >> "$scriptLog"
+        echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog"
+        echo -e "$adjusted_uid"
+        return
+        fi
+        
+        # if so ( uid_conflict="Yes" ), increment adjusted_uid and try again on next loop
+        (( adjusted_uid++ ));
+        (( index++ ))
+    done
 }
 
 #=======================================================================
 # requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset"
 # purpose: returns candidate uid in scope greater than 500 in range of offset.
 find_readjusted_uid() {
-	echo -e "$currentDate: + [Enter] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
-	# vars #
-	local adjusted_uid
-	local original_uid
-	local index
-	local uid_conflict
-	local uid_range
-	
-	original_uid=$unadjusted_uid
-	index=0
-	uid_conflict="Yes"
-	
-	uid_range="$( find_uid_range )"
-	
-	case "$uid_range" in
-	# range (a) - 1/2 cases that should be migrated
-	"lower_boundary" )
-		echo -e "$currentDate: -- UID: \"$unadjusted_uid\" incremented outside acceptable offset range. Resetting UID value (\"$original_uid\") to satisfy range condition --" 2>&1 | tee >> "$scriptLog";
-		# reset uid starting point by convention. 
-		original_uid=$(( range_500 + 1 - offset ))
-		;;
-	# range (b) - 2/2 cases that should be migrated
-	"negative_offset" )
-		echo -e "$currentDate: ++ UID: \"$unadjusted_uid\" needs to be incremented to a valid id above 500 ++" 2>&1 | tee >> "$scriptLog";
-		;;
-	# range (c), # range (d) - do nothing
-	"positive_offset" | "upper_boundary" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" already incremented above 500 -+" 2>&1 | tee >> "$scriptLog"; echo "$unadjusted_uid"; return;
-		;;
-	# range (undefined) - do nothing
-	"undefined" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" is \"undefined\" -+" 2>&1 | tee >> "$scriptLog"; echo "-1"; return;
-		;;
-	* )
-		# this condition should never be triggered and is only here for complete coverage
-		echo -e "$currentDate: -- This is an un-handled condition --" 2>&1 | tee >> "$scriptLog"; echo ""; return;
-	esac
-	
-	# set start best guess offset for the adjusted_uid under the assumption that the UID is exactly displaced by an offset of 100.
-	adjusted_uid=$(( original_uid + offset ))
-		# if not, then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid. 
-		# if so, increment adjusted_uid and try again in another while loop
-	while [[ "$uid_conflict" = "Yes" ]] && [[ "$index" -lt "$offset" ]]
-	do
-		# check to see if uid conflicts with a uid that is in use.
-		# if not, then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid. 
-		# if so, increment adjusted_uid and try again on next loop
-		uid_conflict=$( uid_exists "$adjusted_uid" )
-		
-		if [[ "$uid_conflict" != "Yes" ]]; then
-		echo -e "$currentDate: + Found valid adjusted UID: \"$adjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
-		echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
-		echo -e "$adjusted_uid"
-		return
-		fi
+    echo -e "$currentDate: + [Enter] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
+    # vars #
+    local adjusted_uid
+    local original_uid
+    local index
+    local uid_conflict
+    local uid_range
+    
+    original_uid=$unadjusted_uid
+    index=0
+    uid_conflict="Yes"
+    
+    uid_range="$( find_uid_range )"
+    
+    case "$uid_range" in
+    # range (a) - 1/2 cases that should be migrated
+    "lower_boundary" )
+        echo -e "$currentDate: -- UID: \"$unadjusted_uid\" incremented outside acceptable offset range. Resetting UID value (\"$original_uid\") to satisfy range condition --" 2>&1 | tee >> "$scriptLog";
+        # reset uid starting point by convention. 
+        original_uid=$(( range_500 + 1 - offset ))
+        ;;
+    # range (b) - 2/2 cases that should be migrated
+    "negative_offset" )
+        echo -e "$currentDate: ++ UID: \"$unadjusted_uid\" needs to be incremented to a valid id above 500 ++" 2>&1 | tee >> "$scriptLog";
+        ;;
+    # range (c), # range (d) - do nothing
+    "positive_offset" | "upper_boundary" )
+        echo -e "$currentDate: +- UID: \"$unadjusted_uid\" already incremented above 500 -+" 2>&1 | tee >> "$scriptLog"; echo "$unadjusted_uid"; return;
+        ;;
+    # range (undefined) - do nothing
+    "undefined" )
+        echo -e "$currentDate: +- UID: \"$unadjusted_uid\" is \"undefined\" -+" 2>&1 | tee >> "$scriptLog"; echo "-1"; return;
+        ;;
+    * )
+        # this condition should never be triggered and is only here for complete coverage
+        echo -e "$currentDate: -- This is an un-handled condition --" 2>&1 | tee >> "$scriptLog"; echo ""; return;
+    esac
+    
+    # set start best guess offset for the adjusted_uid under the assumption that the UID is exactly displaced by an offset of 100.
+    adjusted_uid=$(( original_uid + offset ))
+        # if not, then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid. 
+        # if so, increment adjusted_uid and try again in another while loop
+    while [[ "$uid_conflict" = "Yes" ]] && [[ "$index" -lt "$offset" ]]
+    do
+        # check to see if uid conflicts with a uid that is in use.
+        # if not, then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid. 
+        # if so, increment adjusted_uid and try again on next loop
+        uid_conflict=$( uid_exists "$adjusted_uid" )
+        
+        if [[ "$uid_conflict" != "Yes" ]]; then
+        echo -e "$currentDate: + Found valid adjusted UID: \"$adjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
+        echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
+        echo -e "$adjusted_uid"
+        return
+        fi
 
-		(( adjusted_uid++ ));
-		(( index++ ))
-	done
+        (( adjusted_uid++ ));
+        (( index++ ))
+    done
 }
 
 
@@ -311,25 +311,25 @@ unhide_users() {
 # requirements: ƒ"find_adjusted_uid", ƒ"migrate_uid_permissions", global vars "unadjusted_uid", "verified_user_name"
 # purpose: down-convert the "unadjusted_uid" and migrate the file permissions
 convert_user_uid() {
-	local adjusted_uid
+    local adjusted_uid
    
     # calculate adjusted uid
     adjusted_uid=$( find_readjusted_uid )
-	if [[ $adjusted_uid -eq $unadjusted_uid ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$range_500\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	elif [[ "$adjusted_uid" -eq "-1" ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is \"undefined\". No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	elif [[ -z "$adjusted_uid" ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is an \"un-handled\" condition. No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	fi
-	
+    if [[ $adjusted_uid -eq $unadjusted_uid ]]; then
+    echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$range_500\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
+    elif [[ "$adjusted_uid" -eq "-1" ]]; then
+    echo -e "- The UID: \"$unadjusted_uid\" is \"undefined\". No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
+    elif [[ -z "$adjusted_uid" ]]; then
+    echo -e "- The UID: \"$unadjusted_uid\" is an \"un-handled\" condition. No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
+    fi
+    
     echo -e "Username : \"$verified_user_name\"\tUID : \"$unadjusted_uid\"\t Adjusted UID : \"$adjusted_uid\"" 2>&1 | tee >> "$scriptLog"
 
-	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
-	# step 1 - change the current uid to the proposed adjusted uid
+    ## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state    
+    # step 1 - change the current uid to the proposed adjusted uid
     #dscl . -change /Users/"$verified_user_name" UniqueID "$unadjusted_uid" "$adjusted_uid";
- 	
- 	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
+     
+     # step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
     #migrate_uid_permissions "$adjusted_uid"
     
     # step 3 - revert the Hide500Users changes to com.apple.loginwindow
@@ -353,13 +353,13 @@ revert_user_uid() {
     elif ! [[ $adjusted_uid -gt 500 ]] && ! [[  $adjusted_uid -lt $(( 500 + offset )) ]]; then
     echo -e "$currentDate: ++ The adjusted UID: \"$adjusted_uid\" satisfies the range condition. The proposed UID adjustment satisfies all conditions. ++" 2>&1 | tee >> "$scriptLog"; return;
 
-	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
-	# step 1 - change the current uid to the proposed adjusted uid
+    ## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state    
+    # step 1 - change the current uid to the proposed adjusted uid
     #dscl . -change /Users/"$verified_user_name" UniqueID "$unadjusted_uid" "$adjusted_uid";
     else echo -e "$currentDate: -- The adjusted UID failed to satisfy the range condition --" 2>&1 | tee >> "$scriptLog"; return;
     fi
- 	
- 	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
+     
+     # step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
     #migrate_uid_permissions "$adjusted_uid"
     
     # step 3 - revert the Hide500Users changes to com.apple.loginwindow
