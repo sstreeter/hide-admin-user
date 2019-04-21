@@ -429,7 +429,7 @@ valid="$( validate_user $username )"
 echo -e "Valid User - $valid"
 if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"Account name\"\nof a user with administrative privileges!"; exit; fi
 
-# Testing 123
+
 # 
 # # global vars
 # offset=100;
