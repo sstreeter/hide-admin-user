@@ -134,6 +134,7 @@ find_uid_range() {
 # The offset should not be greater than 200, but when demoting the uid, it must not be greater 
 # than 500 (demoting a user from a UID of 500 would make him root (uid = 0 ), which is already in use)
 # a larger negative offset than 500 would result in negative UID's, forming a lower boundary condition.
+# 500 is part of the negative offset
 # R(a) { lower boundary} - all values less than ( 500 - offset) 
 # R(b) { negative offset }  - all values greater than ( 500 - offset) but less than 500
 # R(500) { no man's land - DMZ } - only 500
@@ -312,8 +313,8 @@ unhide_users() {
 convert_user_uid() {
 	local adjusted_uid
    
-    # calculate adjusted uid #|| [[ -z $adjusted_uid -eq ]]
-    adjusted_uid=$(find_readjusted_uid)
+    # calculate adjusted uid
+    adjusted_uid=$( find_readjusted_uid )
 	if [[ $adjusted_uid -eq $unadjusted_uid ]]; then
 	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$range_500\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
 	elif [[ "$adjusted_uid" -eq "-1" ]]; then
@@ -343,12 +344,10 @@ revert_user_uid() {
     local adjusted_uid
    
     # calculate adjusted uid
-    adjusted_uid=$(find_readjusted_uid)
+    adjusted_uid=$( find_readjusted_uid )
    
     echo -e "Username : \"$verified_user_name\"\tUID : \"$unadjusted_uid\"\t: \"$adjusted_uid\"";
 
-    # Change user id; Think of someway to accommodate a revert based on a negative offset and current uid below 500
-    #### some condition is not being covered here, it has to do with users have been hidden ####
     if [[ $unadjusted_uid -gt 500 ]] && [[  $adjusted_uid -lt $(( 500 + offset )) ]]; then
     echo -e "$currentDate: +- UID already satisfies the range condition -+" 2>&1 | tee >> "$scriptLog"; return;
     elif ! [[ $adjusted_uid -gt 500 ]] && ! [[  $adjusted_uid -lt $(( 500 + offset )) ]]; then
@@ -385,9 +384,10 @@ migrate_uid_permissions() {
     find /private/var/ -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     echo -e "$currentDate: + [Exit] function call: \"migrate_uid_permissions\" +" 2>&1 | tee >> "$scriptLog";
     
-    find -xP / -user $adjusted_uid -ls > "remnants-$verified_user_name-$unadjusted_uid.txt"
-    # mv /.Trashes/501 /.Trashes/1234
-    find -xL / -name "*501" >> "remnants-$verified_user_name-$unadjusted_uid.txt"
+    # find -xP / -user $unadjusted_uid -ls > -print0 | xargs -0 chown -hf "$adjusted_uid"
+    # mv /.Trashes/$unadjusted_uid /.Trashes/$adjusted_uid
+    # find -xL / -name "*$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
+    
     #https://www.inteller.net/notes/change-user-id-on-snow-leopard
 }
 
@@ -425,16 +425,16 @@ echo -e "Runtime: $currentDate"
 echo -e "===================================================="
  
 username=$1
-valid="$( validate_user $username )"
+valid="$( validate_user "$username" )"
 echo -e "Valid User - $valid"
-if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"Account name\"\nof a user with administrative privileges!"; exit; fi
+if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"Account name\" of a user with administrative privileges!"; exit; fi
 
 
 # 
 # # global vars
-# offset=100;
-# range_500=500
-# verified_user_name=$username
+offset=100;
+range_500=500
+verified_user_name=$username
 # convert_user_uid
 # if [[ $? -eq 0 ]]; then
 # echo -e "${GRN}- Admin User $user_name, was hidden -${NC}"
@@ -481,3 +481,6 @@ if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"A
 # The symbols \< and \> respectively match the empty string at the beginning and end
 # of a word. This script grep's in this fashion to eliminate partial matches.
 # grep -w <word> or  grep -nr '\<word\>'
+
+# Continuously monitor log file command
+# sudo tail -f /var/log/hide_admin_user.log  
