@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #=======================================================================
 # Author:   Spencer Streeter
-# Date:    2019.04.02
+# Date:     2019.04.02
 # Version:  1.0
 # About:    Changes UID of admin user account and hides it.
 #=======================================================================
