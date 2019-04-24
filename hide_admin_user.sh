@@ -86,9 +86,9 @@ validate_user() {
     if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$scriptLog"; exit 1; return; fi
     
 	# check if offset is valid
-    if [[ "$offset" -lt 0 ]] || [[ "$offset" -gt "$turning_point_500" ]]; then 
+    if [[ "$offset" -lt 0 ]] || [[ "$offset" -gt "$turning_point" ]]; then 
     echo -e "${RED}-- Offset value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$scriptLog"
-    echo -e "Please change to a value less than $turning_point_500, preferably 200 or less and greater than zero." 2>&1 | tee >> "$scriptLog" exit 1; return; fi
+    echo -e "Please change to a value less than $turning_point, preferably 200 or less and greater than zero." 2>&1 | tee >> "$scriptLog" exit 1; return; fi
 
    
     # verify username exists then get user's current id
@@ -126,123 +126,72 @@ get_user_uid() {
 }
 
 #=======================================================================
-# requirements: global vars "unadjusted_uid","turning_point_500","offset"
-# purpose: 
-find_uid_range() {
-########################################################################
-# ranges (a)...|...(b)...|(500)|...(c)...|...(d)
-# The offset should not be greater than 200, but when demoting the uid, it must not be greater 
-# than 500 (demoting a user from a UID of 500 would make him root (uid = 0 ), which is already in use)
-# a larger negative offset than 500 would result in negative UID's, forming a lower boundary condition.
-# 500 is part of the negative offset
-# R(a) { lower boundary} - all values less than ( 500 - offset) 
-# R(b) { negative offset }  - all values greater than ( 500 - offset) but less than 500
-# R(500) { no man's land - DMZ } - only 500
-# R(c) { positive offset } - all values greater than 500 but less than ( 500 + offset )
-# R(d) { upper boundary } - greater than ( 500 + offset )
-########################################################################
-# offset	uid							requirements
-# pos		less than turning point		(offset+uid)>tp & (offset+uid)<=32767
-# 			equal to turning point		(offset+uid)>tp & (offset+uid)<=32767
-# 			greater than turning point	no change required
-# neg		less than turning point		no change required
-# 			equal to turning point		no change required
-# 			greater than turning point	(offset+tp)>=0 & (offset+uid) < tp
-# zero		less than turning point		no change
-# 			equal to turning point		no change
-# 			greater than turning point	no change
-########################################################################
-
-# out of bounds
-if [[ "$unadjusted_uid" -lt 0 ]] || [[ "$unadjusted_uid" -gt 32767 ]]; then echo -e "undefined"; return; fi
-
-# range (a) - "unadjusted_uid" <= ( turning_point_500 - offset )
-if [[ "$unadjusted_uid" -le $(( turning_point_500 - offset)) ]]; then echo -e "lower_boundary"; return; fi
-
-# range (b) - {( turning_point_500 - offset ) < unadjusted_uid <= 500
-if [[ "$unadjusted_uid" -le $turning_point_500 ]] && [[ "$unadjusted_uid" -gt $(( turning_point_500 - offset)) ]]; then echo -e "negative_offset"; return; fi
-
-# range (c)  500 < unadjusted_uid < ( turning_point_500 + offset )
-if [[ "$unadjusted_uid" -gt $turning_point_500 ]] && [[ "$unadjusted_uid" -lt $(( turning_point_500 + offset)) ]]; then echo -e "positive_offset"; return; fi 
-
-# range (d) ( turning_point_500 + offset ) <= "unadjusted_uid"
-if [[ "$unadjusted_uid" -ge $(( turning_point_500 + offset)) ]]; then echo -e "upper_boundary"; return; fi 
-
-#https://en.wikipedia.org/wiki/User_identifier
-# Max UID: linux = 65535; older = 32767
-}
-
-
-#=======================================================================
 # requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset"
-# purpose: returns candidate uid in scope greater than 500 in range of offset.
+# purpose: returns candidate uid in scope greater than turning_point in range of offset.
 find_adjusted_uid() {
 	echo -e "$currentDate: + [Enter] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
 	# vars #
+
 	local adjusted_uid 
+	# positive_offset
+	if [[ $offset -ge 0 ]]; then
+		adjusted_uid="$(( turning_point + 1 ))"
+		while [[ "$unadjusted_uid" -le "$turning_point" ]]
+		do
+			# unadjusted_uid is less than or equal to the turning_point and needs to be incremented; "x(0)...->x(uid)<-...x(tp)...x(32k)" or "x(0)...->x(uid)=x(tp)<-...x(32k)"
+			echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point"
 
-# a positive offset is redefined as any available value between the turning_point and up to 
-# and including the upper least common limit (32767) and instead of jumping to an arbitrarily 
-# defined offset, it starts at the value immediately following the turning_point and 
-# increments the uid until a uid conflict does not exist.
-if [[ $offset -ge 0 ]]; then
-	adjusted_uid="$(( turning_point + 1 ))"
-	while [[ "$unadjusted_uid" -le "$turning_point" ]]
-	do
-		echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point" 		# ...and needs to be incremented
-		if [[ "$adjusted_uid" -gt "$turning_point" ]]; then
-		echo -e "Adjusted UID : $adjusted_uid is greater than turning_point : $turning_point"				# satisfies 1st condition of being greater than the turning_point
-		uid_conflict=$( uid_exists "$adjusted_uid" )
-		
-		if [[ "$adjusted_uid" -le "$upper" ]]; then
-		echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper"						# satisfies 2nd condition of being less than or equal to the upper boundary
-		
-		if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return
-		
-		else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"; (( adjusted_uid++ )); continue; fi
-		else echo -e "Adjusted UID is greater than $upper"; fi
-		else echo -e "Adjusted UID is less than or equal to $turning_point"; fi 
-	done
-fi
+			# satisfies 1st condition of being greater than the turning_point; "x(0)...x(tp)...->x(adj)<-...x(32k)"
+			if [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "Adjusted UID : $adjusted_uid is greater than turning_point : $turning_point"; uid_conflict=$( uid_exists "$adjusted_uid" );
 
-if [[ $offset -lt 0 ]]; then
-adjusted_uid="$(( turning_point + offset ))"
-	while [[ "$unadjusted_uid" -gt "$turning_point" ]]
-	do
-		# unadjusted_uid is greater than the turning_point and needs to be decremented
-		echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point"
-		 	
-		# satisfies 1st condition of being greater than the turning_point		
-		if [[ "$adjusted_uid" -le "$turning_point" ]]; then echo -e "Adjusted UID : $adjusted_uid is less than or equal to the turning_point : $turning_point";	
-			uid_conflict=$( uid_exists "$adjusted_uid" );
-			
-		# satisfies 2nd condition of being less than or equal to the upper boundary
-		if [[ "$adjusted_uid" -ge "$lower" ]]; then echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower";
-		
-		# if the adjusted uid is not in use, return the value, otherwise increment and try agin
-		if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
-		else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"; (( adjusted_uid++ )); continue; fi
+			# satisfies 2nd condition of being less than or equal to the upper boundary; "x(0)...x(tp)...->x(adj)<-...x(32k) or x(0)...x(tp)......->x(adj)=x(32k)<-
+			if [[ "$adjusted_uid" -le "$upper" ]]; then echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper";						
 
-		else echo -e "Adjusted UID is less than $lower"; fi 
+			# if the adjusted uid is not in use, return the value, otherwise increment and try agin
+			if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
+			else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"; (( adjusted_uid++ )); continue; fi
+			else echo -e "Adjusted UID is greater than $upper"; fi 
+			else echo -e "Adjusted UID is less than or equal to $turning_point"; fi
+		done
+	fi
 
-		else echo -e "Adjusted UID is greater than $turning_point"; fi 
-	done
-fi
+	# negative_offset
+	if [[ $offset -lt 0 ]]; then
+	adjusted_uid="$(( turning_point ))"
+		while [[ "$unadjusted_uid" -gt "$turning_point" ]]
+		do
+			# unadjusted_uid is greater than the turning_point and needs to be decremented
+			echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point" 			
 
-}
+			# satisfies 1st condition of being less than or equal to the turning_point
+			if [[ "$adjusted_uid" -le "$turning_point" ]]; then
+			echo -e "Adjusted UID : $adjusted_uid is less than or equal to the turning_point : $turning_point"	
+			uid_conflict=$( uid_exists "$adjusted_uid" )
+	
+			# satisfies 2nd condition of being greater than or equal to the lower boundary
+			if [[ "$adjusted_uid" -ge "$lower" ]]; then
+			echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower"
+	
+			# if the adjusted uid is not in use, return the value, otherwise decrement and try agin
+			if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
+			else echo -e "Adjusted UID: $adjusted_uid is in-use -> decrement the Adjusted UID and try again"; (( adjusted_uid-- )); continue; fi
+			else echo -e "Adjusted UID is less than $lower"; fi 
+			else echo -e "Adjusted UID is greater than $turning_point"; fi 
+		done
+	fi
 }
 
 
 #=======================================================================
-# requirements: admin users with uid's set below 500 
-# purpose: modifies com.apple.loginwindow to hide admin users with uid's below 500
+# requirements: admin users with uid's set below turning_point 
+# purpose: modifies com.apple.loginwindow to hide admin users with uid's below turning_point
 hide_users() {
 sudo defaults write /Library/Preferences/com.apple.loginwindow Hide500Users -bool YES
 }
 
 #=======================================================================
-# requirements: admin users with uid's below 500. 
-# purpose: reverts the hide_users change to com.apple.loginwindow.plist to restore uids to uid's above 500 so that they can be properly handled as normal accounts.
+# requirements: admin users with uid's below turning_point. 
+# purpose: reverts the hide_users change to com.apple.loginwindow.plist to restore uids to uid's above turning_point so that they can be properly handled as normal accounts.
 unhide_users() {
     undo_hide500() { sudo defaults delete /Library/Preferences/com.apple.loginwindow Hide500Users; } 
     result=$(sudo defaults read /Library/Preferences/com.apple.loginwindow | grep Hide500Users)
@@ -258,7 +207,7 @@ convert_user_uid() {
     # calculate adjusted uid
     adjusted_uid=$( find_readjusted_uid )
 	if [[ $adjusted_uid -eq $unadjusted_uid ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$turning_point_500\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
+	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$turning_point\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
 	elif [[ "$adjusted_uid" -eq "-1" ]]; then
 	echo -e "- The UID: \"$unadjusted_uid\" is \"undefined\". No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
 	elif [[ -z "$adjusted_uid" ]]; then
@@ -275,7 +224,7 @@ convert_user_uid() {
     #migrate_uid_permissions "$adjusted_uid"
     
     # step 3 - revert the Hide500Users changes to com.apple.loginwindow
-    # condition to hide users below 500
+    # condition to hide users below turning_point
     #hide_users
 }
 
@@ -290,9 +239,9 @@ revert_user_uid() {
    
     echo -e "Username : \"$verified_user_name\"\tUID : \"$unadjusted_uid\"\t: \"$adjusted_uid\"";
 
-    if [[ $unadjusted_uid -gt 500 ]] && [[  $adjusted_uid -lt $(( 500 + offset )) ]]; then
+    if [[ $unadjusted_uid -gt $turning_point ]] && [[  $adjusted_uid -lt $(( $turning_point + offset )) ]]; then
     echo -e "$currentDate: +- UID already satisfies the range condition -+" 2>&1 | tee >> "$scriptLog"; return;
-    elif ! [[ $adjusted_uid -gt 500 ]] && ! [[  $adjusted_uid -lt $(( 500 + offset )) ]]; then
+    elif ! [[ $adjusted_uid -gt $turning_point ]] && ! [[  $adjusted_uid -lt $(( $turning_point + offset )) ]]; then
     echo -e "$currentDate: ++ The adjusted UID: \"$adjusted_uid\" satisfies the range condition. The proposed UID adjustment satisfies all conditions. ++" 2>&1 | tee >> "$scriptLog"; return;
 
 	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
@@ -305,7 +254,7 @@ revert_user_uid() {
     #migrate_uid_permissions "$adjusted_uid"
     
     # step 3 - revert the Hide500Users changes to com.apple.loginwindow
-    # condition to uhide users below 500
+    # condition to uhide users below $turning_point
     #unhide_users
 }
 
@@ -383,7 +332,7 @@ if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"A
 # 
 # # global vars
 offset=100;
-turning_point_500=500
+turning_point=500
 verified_user_name=$username
 # convert_user_uid
 # if [[ $? -eq 0 ]]; then
