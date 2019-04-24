@@ -126,57 +126,55 @@ get_user_uid() {
 }
 
 #=======================================================================
-# requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset"
-# purpose: returns candidate uid in scope greater than turning_point in range of offset.
+# requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset", "turning_point"
+# purpose: returns available adjusted uid.
 find_adjusted_uid() {
 	echo -e "$currentDate: + [Enter] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
 	# vars #
-
 	local adjusted_uid 
+	
 	# positive_offset
 	if [[ $offset -ge 0 ]]; then
 		adjusted_uid="$(( turning_point + 1 ))"
 		while [[ "$unadjusted_uid" -le "$turning_point" ]]
 		do
 			# unadjusted_uid is less than or equal to the turning_point and needs to be incremented; "x(0)...->x(uid)<-...x(tp)...x(32k)" or "x(0)...->x(uid)=x(tp)<-...x(32k)"
-			echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point"
+			echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point" 2>&1 | tee >> "$scriptLog";
 
 			# satisfies 1st condition of being greater than the turning_point; "x(0)...x(tp)...->x(adj)<-...x(32k)"
-			if [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "Adjusted UID : $adjusted_uid is greater than turning_point : $turning_point"; uid_conflict=$( uid_exists "$adjusted_uid" );
+			if [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "Adjusted UID : $adjusted_uid is greater than turning_point : $turning_point" 2>&1 | tee >> "$scriptLog"; uid_conflict=$( uid_exists "$adjusted_uid" );
 
 			# satisfies 2nd condition of being less than or equal to the upper boundary; "x(0)...x(tp)...->x(adj)<-...x(32k) or x(0)...x(tp)......->x(adj)=x(32k)<-
-			if [[ "$adjusted_uid" -le "$upper" ]]; then echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper";						
+			if [[ "$adjusted_uid" -le "$upper" ]]; then echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper" 2>&1 | tee >> "$scriptLog";						
 
 			# if the adjusted uid is not in use, return the value, otherwise increment and try agin
-			if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
-			else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"; (( adjusted_uid++ )); continue; fi
-			else echo -e "Adjusted UID is greater than $upper"; fi 
-			else echo -e "Adjusted UID is less than or equal to $turning_point"; fi
+			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog"; echo "$adjusted_uid"; return;
+			else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again" 2>&1 | tee >> "$scriptLog"; (( adjusted_uid++ )); continue; fi
+			else echo -e "Adjusted UID is greater than $upper" 2>&1 | tee >> "$scriptLog"; fi 
+			else echo -e "Adjusted UID is less than or equal to $turning_point" 2>&1 | tee >> "$scriptLog"; fi
 		done
 	fi
 
-	# negative_offset
+	# negative_offset, to change to offset rule, simply modify adjusted_uid="$(( turning_point + offset ))" and (( adjusted_uid++ ))
 	if [[ $offset -lt 0 ]]; then
 	adjusted_uid="$(( turning_point ))"
 		while [[ "$unadjusted_uid" -gt "$turning_point" ]]
 		do
 			# unadjusted_uid is greater than the turning_point and needs to be decremented
-			echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point" 			
+			echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point" 2>&1 | tee >> "$scriptLog";			
 
 			# satisfies 1st condition of being less than or equal to the turning_point
-			if [[ "$adjusted_uid" -le "$turning_point" ]]; then
-			echo -e "Adjusted UID : $adjusted_uid is less than or equal to the turning_point : $turning_point"	
-			uid_conflict=$( uid_exists "$adjusted_uid" )
+			if [[ "$adjusted_uid" -le "$turning_point" ]]; then echo -e "Adjusted UID : $adjusted_uid is less than or equal to the turning_point : $turning_point" 2>&1 | tee >> "$scriptLog"; uid_conflict=$( uid_exists "$adjusted_uid" );
 	
 			# satisfies 2nd condition of being greater than or equal to the lower boundary
 			if [[ "$adjusted_uid" -ge "$lower" ]]; then
-			echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower"
+			echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower" 2>&1 | tee >> "$scriptLog";
 	
 			# if the adjusted uid is not in use, return the value, otherwise decrement and try agin
-			if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
-			else echo -e "Adjusted UID: $adjusted_uid is in-use -> decrement the Adjusted UID and try again"; (( adjusted_uid-- )); continue; fi
-			else echo -e "Adjusted UID is less than $lower"; fi 
-			else echo -e "Adjusted UID is greater than $turning_point"; fi 
+			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog"; echo "$adjusted_uid"; return;
+			else echo -e "Adjusted UID: $adjusted_uid is in-use -> decrement the Adjusted UID and try again" 2>&1 | tee >> "$scriptLog"; (( adjusted_uid-- )); continue; fi
+			else echo -e "Adjusted UID is less than $lower" 2>&1 | tee >> "$scriptLog"; fi 
+			else echo -e "Adjusted UID is greater than $turning_point" 2>&1 | tee >> "$scriptLog"; fi 
 		done
 	fi
 }
@@ -198,57 +196,21 @@ unhide_users() {
     if [ -n "$result" ]; then undo_hide500; fi
 }
 
-#=======================================================================
-# requirements: ƒ"find_adjusted_uid", ƒ"migrate_uid_permissions", global vars "unadjusted_uid", "verified_user_name"
-# purpose: down-convert the "unadjusted_uid" and migrate the file permissions
-convert_user_uid() {
-	local adjusted_uid
-   
-    # calculate adjusted uid
-    adjusted_uid=$( find_readjusted_uid )
-	if [[ $adjusted_uid -eq $unadjusted_uid ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$turning_point\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	elif [[ "$adjusted_uid" -eq "-1" ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is \"undefined\". No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	elif [[ -z "$adjusted_uid" ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is an \"un-handled\" condition. No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	fi
-	
-    echo -e "Username : \"$verified_user_name\"\tUID : \"$unadjusted_uid\"\t Adjusted UID : \"$adjusted_uid\"" 2>&1 | tee >> "$scriptLog"
-
-	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
-	# step 1 - change the current uid to the proposed adjusted uid
-    #dscl . -change /Users/"$verified_user_name" UniqueID "$unadjusted_uid" "$adjusted_uid";
- 	
- 	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
-    #migrate_uid_permissions "$adjusted_uid"
-    
-    # step 3 - revert the Hide500Users changes to com.apple.loginwindow
-    # condition to hide users below turning_point
-    #hide_users
-}
 
 #=======================================================================
 # requirements: 
 # purpose: 
-revert_user_uid() {
+migrate_user_uid() {
     local adjusted_uid
    
     # calculate adjusted uid
-    adjusted_uid=$( find_readjusted_uid )
+    adjusted_uid=$( find_adjusted_uid )
    
     echo -e "Username : \"$verified_user_name\"\tUID : \"$unadjusted_uid\"\t: \"$adjusted_uid\"";
-
-    if [[ $unadjusted_uid -gt $turning_point ]] && [[  $adjusted_uid -lt $(( $turning_point + offset )) ]]; then
-    echo -e "$currentDate: +- UID already satisfies the range condition -+" 2>&1 | tee >> "$scriptLog"; return;
-    elif ! [[ $adjusted_uid -gt $turning_point ]] && ! [[  $adjusted_uid -lt $(( $turning_point + offset )) ]]; then
-    echo -e "$currentDate: ++ The adjusted UID: \"$adjusted_uid\" satisfies the range condition. The proposed UID adjustment satisfies all conditions. ++" 2>&1 | tee >> "$scriptLog"; return;
 
 	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
 	# step 1 - change the current uid to the proposed adjusted uid
     #dscl . -change /Users/"$verified_user_name" UniqueID "$unadjusted_uid" "$adjusted_uid";
-    else echo -e "$currentDate: -- The adjusted UID failed to satisfy the range condition --" 2>&1 | tee >> "$scriptLog"; return;
-    fi
  	
  	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
     #migrate_uid_permissions "$adjusted_uid"

@@ -17,16 +17,13 @@ uid_exists() {
     #echo -e "$currentDate: + [Exit] function call: \"uid_exists\" +" 2>&1 | tee >> "$scriptLog";
 }
 
-pos_uid_offset() {
-local uid_offset
+find_adjusted_uid() {
 local adjusted_uid 
-# uid_offset=$(( turning_point-unadjusted_uid )) # positive offset when uid < turning_point
 
 # a positive offset is redefined as any available value between the turning_point and up to 
 # and including the upper least common limit (32767) and instead of jumping to an arbitrarily 
 # defined offset, it starts at the value immediately following the turning_point and 
 # increments the uid until a uid conflict does not exist.
-echo -e "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 if [[ $offset -ge 0 ]]; then
 	adjusted_uid="$(( turning_point + 1 ))"
 	while [[ "$unadjusted_uid" -le "$turning_point" ]]
@@ -42,7 +39,6 @@ if [[ $offset -ge 0 ]]; then
 				return
 				else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"
 				(( adjusted_uid++ ))
-				echo -e "++++++++++++++++++++++++++++++++++++++++++++++++++"
 				continue
 				fi
 			else echo -e "Adjusted UID is greater than $upper"
@@ -53,8 +49,7 @@ if [[ $offset -ge 0 ]]; then
 fi
 
 if [[ $offset -lt 0 ]]; then
-echo -e "##################################################"
-adjusted_uid="$(( turning_point + offset ))"
+adjusted_uid="$(( turning_point ))"
 	while [[ "$unadjusted_uid" -gt "$turning_point" ]]
 	do
 		echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point" 			# ...and needs to be decremented
@@ -66,9 +61,8 @@ adjusted_uid="$(( turning_point + offset ))"
 				if [[ "$uid_conflict" != "Yes" ]]; then
 				echo "$adjusted_uid";
 				return
-				else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"
-				(( adjusted_uid++ ))
-				echo -e "--------------------------------------------------"
+				else echo -e "Adjusted UID: $adjusted_uid is in-use -> decrement the Adjusted UID and try again"
+				(( adjusted_uid-- ))
 				continue
 				fi
 			else echo -e "Adjusted UID is less than $lower"
@@ -99,6 +93,6 @@ uid="501"
 for i in {496..502}
 do
 	unadjusted_uid=$i
-	pos_uid_offset $unadjusted_uid
+	find_adjusted_uid $unadjusted_uid
 done
 
