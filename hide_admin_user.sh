@@ -85,9 +85,9 @@ validate_user() {
     # check that script is run as root
     if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$scriptLog"; exit 1; return; fi
     
-	# check if offset is valid
-    if [[ "$offset" -lt 0 ]] || [[ "$offset" -gt "$turning_point" ]]; then 
-    echo -e "${RED}-- Offset value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$scriptLog"
+	# check if offset_uid is valid
+    if [[ "$offset_uid" -lt 0 ]] || [[ "$offset_uid" -gt "$turning_point" ]]; then 
+    echo -e "${RED}-- offset_uid value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$scriptLog"
     echo -e "Please change to a value less than $turning_point, preferably 200 or less and greater than zero." 2>&1 | tee >> "$scriptLog" exit 1; return; fi
 
    
@@ -106,6 +106,7 @@ validate_user() {
     echo -e "$currentDate: -- User \"$verified_user_name\" is not an admin --" 2>&1 | tee >> "$scriptLog"; return
     else echo -e "$currentDate: ++ User \"$verified_user_name\" is an admin ++" 2>&1 | tee >> "$scriptLog"
     fi
+    	
     # return "Yes" for all tests passed
     echo "Yes"
     echo -e "$currentDate: + [Exit] function call: \"validate_user\" +" 2>&1 | tee >> "$scriptLog"; return
@@ -126,15 +127,15 @@ get_user_uid() {
 }
 
 #=======================================================================
-# requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset", "turning_point"
+# requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset_uid", "turning_point"
 # purpose: returns available adjusted uid.
 find_adjusted_uid() {
-	echo -e "$currentDate: + [Enter] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
+	echo -e "$currentDate: + [Enter] function call: \"find_adjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
 	# vars #
 	local adjusted_uid 
 	
-	# positive_offset
-	if [[ $offset -ge 0 ]]; then
+	# positive_offset_uid
+	if [[ $offset_uid -ge 0 ]]; then
 		adjusted_uid="$(( turning_point + 1 ))"
 		while [[ "$unadjusted_uid" -le "$turning_point" ]]
 		do
@@ -148,15 +149,15 @@ find_adjusted_uid() {
 			if [[ "$adjusted_uid" -le "$upper" ]]; then echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper" 2>&1 | tee >> "$scriptLog";						
 
 			# if the adjusted uid is not in use, return the value, otherwise increment and try agin
-			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog"; echo "$adjusted_uid"; return;
+			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: + [Exit] function call: \"find_adjusted_uid\" +" 2>&1 | tee >> "$scriptLog"; echo "$adjusted_uid"; return;
 			else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again" 2>&1 | tee >> "$scriptLog"; (( adjusted_uid++ )); continue; fi
 			else echo -e "Adjusted UID is greater than $upper" 2>&1 | tee >> "$scriptLog"; fi 
 			else echo -e "Adjusted UID is less than or equal to $turning_point" 2>&1 | tee >> "$scriptLog"; fi
 		done
 	fi
 
-	# negative_offset, to change to offset rule, simply modify adjusted_uid="$(( turning_point + offset ))" and (( adjusted_uid++ ))
-	if [[ $offset -lt 0 ]]; then
+	# negative_offset_uid, to change to offset_uid rule, simply modify adjusted_uid="$(( turning_point + offset_uid ))" and (( adjusted_uid++ ))
+	if [[ $offset_uid -lt 0 ]]; then
 	adjusted_uid="$(( turning_point ))"
 		while [[ "$unadjusted_uid" -gt "$turning_point" ]]
 		do
@@ -171,7 +172,7 @@ find_adjusted_uid() {
 			echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower" 2>&1 | tee >> "$scriptLog";
 	
 			# if the adjusted uid is not in use, return the value, otherwise decrement and try agin
-			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog"; echo "$adjusted_uid"; return;
+			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: + [Exit] function call: \"find_adjusted_uid\" +" 2>&1 | tee >> "$scriptLog"; echo "$adjusted_uid"; return;
 			else echo -e "Adjusted UID: $adjusted_uid is in-use -> decrement the Adjusted UID and try again" 2>&1 | tee >> "$scriptLog"; (( adjusted_uid-- )); continue; fi
 			else echo -e "Adjusted UID is less than $lower" 2>&1 | tee >> "$scriptLog"; fi 
 			else echo -e "Adjusted UID is greater than $turning_point" 2>&1 | tee >> "$scriptLog"; fi 
@@ -201,8 +202,8 @@ unhide_users() {
 # requirements: 
 # purpose: 
 migrate_user_uid() {
-    local adjusted_uid
-   
+	local adjusted_uid
+	
     # calculate adjusted uid
     adjusted_uid=$( find_adjusted_uid )
    
@@ -265,18 +266,18 @@ RED='\033[0;31m'
 GRN='\033[0;32m'
 YLW='\033[1;33m'
 NC='\033[0m'    # No Color
- 
 scriptLog="/var/log/hide_admin_user.log"    # Log file
 currentDate=$(date "+%a %b %d %I:%M:%S %p\$")
 FAIL="${RED}- Fail -${NC}"
 PASS="${GRN}- Success -${NC}"
-offset=
+offset_uid=
 unadjusted_uid=
 unverified_user_name=
 username=
 valid=
 verified_user_name=
-
+upper=
+lower=
 
 # Send stdout to "$scriptLog", and then stderr(2) to stdout(1)
 exec 1>> "$scriptLog" 2>&1
@@ -290,13 +291,19 @@ valid="$( validate_user "$username" )"
 echo -e "Valid User - $valid"
 if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"Account name\" of a user with administrative privileges!"; exit; fi
 
-
-# 
 # # global vars
-offset=100;
+upper=32767
+lower=0
+
+offset_uid=1;
 turning_point=500
 verified_user_name=$username
-# convert_user_uid
+
+echo "Username: \"$validate_user\""
+unadjusted_uid=$( get_user_uid $validate_user )
+
+echo -e "Username : \"$verified_user_name\" UID : \"$unadjusted_uid\"";
+migrate_user_uid
 # if [[ $? -eq 0 ]]; then
 # echo -e "${GRN}- Admin User $user_name, was hidden -${NC}"
 # else echo  -e "${RED}- User $user_name was not hidden -${NC}"
@@ -309,7 +316,8 @@ verified_user_name=$username
 # else echo  -e "${RED}- User $user_name was not un-hidden -${NC}"
 # fi
  
-#unhide_users
+# **DANGER** - Force migration make sure you know what the current uid and username
+
 # Reference
 # [1]   https://stackoverflow.com/questions/1216922/sh-command-exec-21
 # [2]   https://unix.stackexchange.com/questions/183125/what-does-1-and-2-mean-in-a-bash-script
@@ -346,13 +354,13 @@ verified_user_name=$username
 # Continuously monitor log file command
 # sudo tail -f /var/log/hide_admin_user.log  
 
-# offset	uid							requirements
-# pos		less than turning point		(offset+uid)>tp & (offset+uid)<=32767
-# 			equal to turning point		(offset+uid)>tp & (offset+uid)<=32767
+# offset_uid	uid							requirements
+# pos		less than turning point		(offset_uid+uid)>tp & (offset_uid+uid)<=32767
+# 			equal to turning point		(offset_uid+uid)>tp & (offset_uid+uid)<=32767
 # 			greater than turning point	no change required
 # neg		less than turning point		no change required
 # 			equal to turning point		no change required
-# 			greater than turning point	(offset+tp)>=0 & (offset+uid) < tp
+# 			greater than turning point	(offset_uid+tp)>=0 & (offset_uid+uid) < tp
 # zero		less than turning point		no change
 # 			equal to turning point		no change
 # 			greater than turning point	no change
