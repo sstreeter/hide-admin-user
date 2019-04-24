@@ -86,9 +86,9 @@ validate_user() {
     if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$scriptLog"; exit 1; return; fi
     
 	# check if offset is valid
-    if [[ "$offset" -lt 0 ]] || [[ "$offset" -gt "$range_500" ]]; then 
+    if [[ "$offset" -lt 0 ]] || [[ "$offset" -gt "$turning_point_500" ]]; then 
     echo -e "${RED}-- Offset value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$scriptLog"
-    echo -e "Please change to a value less than $range_500, preferably 200 or less and greater than zero." 2>&1 | tee >> "$scriptLog" exit 1; return; fi
+    echo -e "Please change to a value less than $turning_point_500, preferably 200 or less and greater than zero." 2>&1 | tee >> "$scriptLog" exit 1; return; fi
 
    
     # verify username exists then get user's current id
@@ -126,7 +126,7 @@ get_user_uid() {
 }
 
 #=======================================================================
-# requirements: global vars "unadjusted_uid","range_500","offset"
+# requirements: global vars "unadjusted_uid","turning_point_500","offset"
 # purpose: 
 find_uid_range() {
 ########################################################################
@@ -141,153 +141,95 @@ find_uid_range() {
 # R(c) { positive offset } - all values greater than 500 but less than ( 500 + offset )
 # R(d) { upper boundary } - greater than ( 500 + offset )
 ########################################################################
+# offset	uid							requirements
+# pos		less than turning point		(offset+uid)>tp & (offset+uid)<=32767
+# 			equal to turning point		(offset+uid)>tp & (offset+uid)<=32767
+# 			greater than turning point	no change required
+# neg		less than turning point		no change required
+# 			equal to turning point		no change required
+# 			greater than turning point	(offset+tp)>=0 & (offset+uid) < tp
+# zero		less than turning point		no change
+# 			equal to turning point		no change
+# 			greater than turning point	no change
+########################################################################
+
 # out of bounds
 if [[ "$unadjusted_uid" -lt 0 ]] || [[ "$unadjusted_uid" -gt 32767 ]]; then echo -e "undefined"; return; fi
 
-# range (a) - "unadjusted_uid" <= ( range_500 - offset )
-if [[ "$unadjusted_uid" -le $(( range_500 - offset)) ]]; then echo -e "lower_boundary"; return; fi
+# range (a) - "unadjusted_uid" <= ( turning_point_500 - offset )
+if [[ "$unadjusted_uid" -le $(( turning_point_500 - offset)) ]]; then echo -e "lower_boundary"; return; fi
 
-# range (b) - {( range_500 - offset ) < unadjusted_uid <= 500
-if [[ "$unadjusted_uid" -le $range_500 ]] && [[ "$unadjusted_uid" -gt $(( range_500 - offset)) ]]; then echo -e "negative_offset"; return; fi
+# range (b) - {( turning_point_500 - offset ) < unadjusted_uid <= 500
+if [[ "$unadjusted_uid" -le $turning_point_500 ]] && [[ "$unadjusted_uid" -gt $(( turning_point_500 - offset)) ]]; then echo -e "negative_offset"; return; fi
 
-# range (c)  500 < unadjusted_uid < ( range_500 + offset )
-if [[ "$unadjusted_uid" -gt $range_500 ]] && [[ "$unadjusted_uid" -lt $(( range_500 + offset)) ]]; then echo -e "positive_offset"; return; fi 
+# range (c)  500 < unadjusted_uid < ( turning_point_500 + offset )
+if [[ "$unadjusted_uid" -gt $turning_point_500 ]] && [[ "$unadjusted_uid" -lt $(( turning_point_500 + offset)) ]]; then echo -e "positive_offset"; return; fi 
 
-# range (d) ( range_500 + offset ) <= "unadjusted_uid"
-if [[ "$unadjusted_uid" -ge $(( range_500 + offset)) ]]; then echo -e "upper_boundary"; return; fi 
+# range (d) ( turning_point_500 + offset ) <= "unadjusted_uid"
+if [[ "$unadjusted_uid" -ge $(( turning_point_500 + offset)) ]]; then echo -e "upper_boundary"; return; fi 
 
 #https://en.wikipedia.org/wiki/User_identifier
 # Max UID: linux = 65535; older = 32767
 }
 
-#=======================================================================
-# requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset"
-# purpose: returns an $adjusted_uid candidate value
-find_adjusted_uid() {
-    echo -e "$currentDate: + [Enter] function call: \"find_adjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
-	# vars #
-	local adjusted_uid
-	local index
-	local original_uid
-	local uid_conflict
-	local uid_range
-	
-	original_uid=$unadjusted_uid
-	index=0
-	uid_conflict="Yes"
-	
-	uid_range="$( find_uid_range )"
-	
-	case "$uid_range" in
-
-	# range (b), # range (a) - do nothing
-	"negative_offset" | "lower_boundary" )
-		echo -e "$currentDate: ++ UID: \"$unadjusted_uid\" is already decremented below 500 ++" 2>&1 | tee >> "$scriptLog"
-		echo "$unadjusted_uid"; return
-		;;
-	# range (c) - 1/2 cases that should be migrated
-	"positive_offset" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" needs to be decremented to a valid id below 500  -+" 2>&1 | tee >> "$scriptLog"
-		;;
-	# range (d) - 2/2 cases that should be migrated
-	"upper_boundary" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" needs to be decremented to a valid id below 500  -+" 2>&1 | tee >> "$scriptLog"
-		# reset uid starting point by convention. 
-		original_uid=$(( range_500 + 1 ))
-		;;
-	# range (undefined) - do nothing
-	"undefined" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" is \"undefined\" -+" 2>&1 | tee >> "$scriptLog"; echo "-1"; return
-		;;
-	* )
-		# this condition should never be triggered and is only here for complete coverage
-		echo -e "$currentDate: -- This is an un-handled condition --" 2>&1 | tee >> "$scriptLog"; echo ""; return
-	esac
-	
-	# best guess offset for the adjusted_uid under the assumption that the UID is exactly displaced by an offset of 100.
-	adjusted_uid=$(( original_uid - offset ))
-	while [[ "$uid_conflict" = "Yes" ]] && [[ "$index" -lt "$offset" ]]
-	do
-		# check to see if uid conflicts with a uid that is in use.
-		uid_conflict=$( uid_exists "$adjusted_uid" )
-		
-		# if not ( uid_conflict="No" ), then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid.
-		if [[ "$uid_conflict" != "Yes" ]]; then
-		echo -e "$currentDate: + Found valid adjusted UID: \"$adjusted_uid\" +" 2>&1 | tee >> "$scriptLog"
-		echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog"
-		echo -e "$adjusted_uid"
-		return
-		fi
-		
-		# if so ( uid_conflict="Yes" ), increment adjusted_uid and try again on next loop
-		(( adjusted_uid++ ));
-		(( index++ ))
-	done
-}
 
 #=======================================================================
 # requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset"
 # purpose: returns candidate uid in scope greater than 500 in range of offset.
-find_readjusted_uid() {
+find_adjusted_uid() {
 	echo -e "$currentDate: + [Enter] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
 	# vars #
-	local adjusted_uid
-	local original_uid
-	local index
-	local uid_conflict
-	local uid_range
-	
-	original_uid=$unadjusted_uid
-	index=0
-	uid_conflict="Yes"
-	
-	uid_range="$( find_uid_range )"
-	
-	case "$uid_range" in
-	# range (a) - 1/2 cases that should be migrated
-	"lower_boundary" )
-		echo -e "$currentDate: -- UID: \"$unadjusted_uid\" incremented outside acceptable offset range. Resetting UID value (\"$original_uid\") to satisfy range condition --" 2>&1 | tee >> "$scriptLog";
-		# reset uid starting point by convention. 
-		original_uid=$(( range_500 + 1 - offset ))
-		;;
-	# range (b) - 2/2 cases that should be migrated
-	"negative_offset" )
-		echo -e "$currentDate: ++ UID: \"$unadjusted_uid\" needs to be incremented to a valid id above 500 ++" 2>&1 | tee >> "$scriptLog";
-		;;
-	# range (c), # range (d) - do nothing
-	"positive_offset" | "upper_boundary" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" already incremented above 500 -+" 2>&1 | tee >> "$scriptLog"; echo "$unadjusted_uid"; return;
-		;;
-	# range (undefined) - do nothing
-	"undefined" )
-		echo -e "$currentDate: +- UID: \"$unadjusted_uid\" is \"undefined\" -+" 2>&1 | tee >> "$scriptLog"; echo "-1"; return;
-		;;
-	* )
-		# this condition should never be triggered and is only here for complete coverage
-		echo -e "$currentDate: -- This is an un-handled condition --" 2>&1 | tee >> "$scriptLog"; echo ""; return;
-	esac
-	
-	# set start best guess offset for the adjusted_uid under the assumption that the UID is exactly displaced by an offset of 100.
-	adjusted_uid=$(( original_uid + offset ))
-		# if not, then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid. 
-		# if so, increment adjusted_uid and try again in another while loop
-	while [[ "$uid_conflict" = "Yes" ]] && [[ "$index" -lt "$offset" ]]
+	local adjusted_uid 
+
+# a positive offset is redefined as any available value between the turning_point and up to 
+# and including the upper least common limit (32767) and instead of jumping to an arbitrarily 
+# defined offset, it starts at the value immediately following the turning_point and 
+# increments the uid until a uid conflict does not exist.
+if [[ $offset -ge 0 ]]; then
+	adjusted_uid="$(( turning_point + 1 ))"
+	while [[ "$unadjusted_uid" -le "$turning_point" ]]
 	do
-		# check to see if uid conflicts with a uid that is in use.
-		# if not, then "adjusted_uid" is designated as valid and exit's while loop, returning the valid uid. 
-		# if so, increment adjusted_uid and try again on next loop
+		echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point" 		# ...and needs to be incremented
+		if [[ "$adjusted_uid" -gt "$turning_point" ]]; then
+		echo -e "Adjusted UID : $adjusted_uid is greater than turning_point : $turning_point"				# satisfies 1st condition of being greater than the turning_point
 		uid_conflict=$( uid_exists "$adjusted_uid" )
 		
-		if [[ "$uid_conflict" != "Yes" ]]; then
-		echo -e "$currentDate: + Found valid adjusted UID: \"$adjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
-		echo -e "$currentDate: + [Exit] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
-		echo -e "$adjusted_uid"
-		return
-		fi
-
-		(( adjusted_uid++ ));
-		(( index++ ))
+		if [[ "$adjusted_uid" -le "$upper" ]]; then
+		echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper"						# satisfies 2nd condition of being less than or equal to the upper boundary
+		
+		if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return
+		
+		else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"; (( adjusted_uid++ )); continue; fi
+		else echo -e "Adjusted UID is greater than $upper"; fi
+		else echo -e "Adjusted UID is less than or equal to $turning_point"; fi 
 	done
+fi
+
+if [[ $offset -lt 0 ]]; then
+adjusted_uid="$(( turning_point + offset ))"
+	while [[ "$unadjusted_uid" -gt "$turning_point" ]]
+	do
+		# unadjusted_uid is greater than the turning_point and needs to be decremented
+		echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point"
+		 	
+		# satisfies 1st condition of being greater than the turning_point		
+		if [[ "$adjusted_uid" -le "$turning_point" ]]; then echo -e "Adjusted UID : $adjusted_uid is less than or equal to the turning_point : $turning_point";	
+			uid_conflict=$( uid_exists "$adjusted_uid" );
+			
+		# satisfies 2nd condition of being less than or equal to the upper boundary
+		if [[ "$adjusted_uid" -ge "$lower" ]]; then echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower";
+		
+		# if the adjusted uid is not in use, return the value, otherwise increment and try agin
+		if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
+		else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"; (( adjusted_uid++ )); continue; fi
+
+		else echo -e "Adjusted UID is less than $lower"; fi 
+
+		else echo -e "Adjusted UID is greater than $turning_point"; fi 
+	done
+fi
+
+}
 }
 
 
@@ -316,7 +258,7 @@ convert_user_uid() {
     # calculate adjusted uid
     adjusted_uid=$( find_readjusted_uid )
 	if [[ $adjusted_uid -eq $unadjusted_uid ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$range_500\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
+	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$turning_point_500\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
 	elif [[ "$adjusted_uid" -eq "-1" ]]; then
 	echo -e "- The UID: \"$unadjusted_uid\" is \"undefined\". No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
 	elif [[ -z "$adjusted_uid" ]]; then
@@ -441,7 +383,7 @@ if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"A
 # 
 # # global vars
 offset=100;
-range_500=500
+turning_point_500=500
 verified_user_name=$username
 # convert_user_uid
 # if [[ $? -eq 0 ]]; then
@@ -492,3 +434,14 @@ verified_user_name=$username
 
 # Continuously monitor log file command
 # sudo tail -f /var/log/hide_admin_user.log  
+
+# offset	uid							requirements
+# pos		less than turning point		(offset+uid)>tp & (offset+uid)<=32767
+# 			equal to turning point		(offset+uid)>tp & (offset+uid)<=32767
+# 			greater than turning point	no change required
+# neg		less than turning point		no change required
+# 			equal to turning point		no change required
+# 			greater than turning point	(offset+tp)>=0 & (offset+uid) < tp
+# zero		less than turning point		no change
+# 			equal to turning point		no change
+# 			greater than turning point	no change
