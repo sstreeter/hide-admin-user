@@ -2,34 +2,34 @@
 #=======================================================================
 # Author:   Spencer Streeter
 # Date:     2019.04.02
-# Version:  1.0
+version="1.0"              
 # About:    Changes UID of admin user account and hides it.
 #=======================================================================
 #####################################
 # functions
 #####################################
 #=======================================================================
-# requirements: unverified username parameter
-# purpose: verifies username argument exists
-user_name_exists() {
-    echo -e "$currentDate: + [Enter] function call: \"user_name_exists\" +" 2>&1 | tee >> "$scriptLog";
+# requirements: unverified userName parameter
+# purpose: verifies userName argument exists
+userNameExists() {
+    echo -e "$currentDate: ++ [Enter] function call: \"userNameExists\" ++" 2>&1 | tee >> "$logFile";
     # vars
     local result
-    local unverified_user_name
+    local unverifiedUserName
  
-    unverified_user_name=$1
+    unverifiedUserName=$1
    
-    ## get exact username not partial match
-    result=$(dscl . -list /Users | grep -w "$unverified_user_name";)
+    ## get exact userName not partial match
+    result=$(dscl . -list /Users | grep -w "$unverifiedUserName";)
     if [[ -n "$result" ]]; then echo "Yes"; else echo "No";fi
-    echo -e "$currentDate: + [Exit] function call: \"user_name_exists\" +" 2>&1 | tee >> "$scriptLog";
+    echo -e "$currentDate: ++ [Exit] function call: \"userNameExists\" ++" 2>&1 | tee >> "$logFile";
 }
  
 #=======================================================================
 # requirements: unverified uid parameter	
 # purpose: checks if uid argument has already been issued.
-uid_exists() {
-    echo -e "$currentDate: + [Enter] function call: \"uid_exists\" +" 2>&1 | tee >> "$scriptLog";
+uidExists() {
+    echo -e "$currentDate: ++ [Enter] function call: \"uidExists\" ++" 2>&1 | tee >> "$logFile";
     # vars
     local result
     local unverified_uid
@@ -40,240 +40,202 @@ uid_exists() {
     
     # if the result is not blank, then the uid exists
     if [ -n "$result" ]; then echo "Yes"; else echo "No"; fi
-    echo -e "$currentDate: + [Exit] function call: \"uid_exists\" +" 2>&1 | tee >> "$scriptLog";
+    echo -e "$currentDate: ++ [Exit] function call: \"uidExists\" ++" 2>&1 | tee >> "$logFile";
 }
  
 #=======================================================================
-# requirements: username parameter.
+# requirements: userName parameter.
 # purpose: checks to see if the given user is an admin
-isadmin() {
-    echo -e "$currentDate: + [Enter] function call: \"isadmin\" +" 2>&1 | tee >> "$scriptLog";
+isAdmin() {
+    echo -e "$currentDate: ++ [Enter] function call: \"isAdmin\" ++" 2>&1 | tee >> "$logFile";
     local result
  
     result=$(id -Gn "$1" | grep -w -o admin;)
     if ! [[ "$result" != "admin" ]]; then echo "Yes"; else echo "No";fi
-    echo -e "$currentDate: + [Exit] function call: \"isadmin\" +" 2>&1 | tee >> "$scriptLog";
+    echo -e "$currentDate: ++ [Exit] function call: \"isAdmin\" ++" 2>&1 | tee >> "$logFile";
 }
 
 #=======================================================================
-# requirements: ƒ"user_name_exists",ƒ"is_admin", unverified username parameter
-# purpose: validates global variable "verified_user_name"
-validate_user() {
-    echo -e "$currentDate: + [Enter] function call: \"validate_user\" +" 2>&1 | tee >> "$scriptLog"
+# requirements: ƒ"userNameExists",ƒ"is_admin", unverified userName parameter
+# purpose: validates global variable "verifiedUserName"
+validateUser() {
+    echo -e "$currentDate: ++ [Enter] function call: \"validateUser\" ++" 2>&1 | tee >> "$logFile"
     local result
-    local unverified_user_name
+    local unverifiedUserName
  
-    unverified_user_name=$1
+    unverifiedUserName=$1
 
     # check if the one parameter and only parameter was provided as an argument to the function call
     if (( $# < 1 )); then
-    echo -e "$currentDate: -- Username parameter is zero length. --" 2>&1 | tee >> "$scriptLog"; exit 1; return
-    else echo -e "$currentDate: ++ Username parameter is at least greater than or equal to 1. ++" 2>&1 | tee >> "$scriptLog"
+    echo -e "$currentDate: -- userName parameter is zero length. --" 2>&1 | tee >> "$logFile"; exit 1; return
+    else echo -e "$currentDate: ++ userName parameter is at least greater than or equal to 1. ++" 2>&1 | tee >> "$logFile"
     fi
     
     if (( $# > 1 ));  then
-    echo -e "$currentDate: -- Too many username parameters have been passed --" 2>&1 | tee >> "$scriptLog"; return
-    else echo -e "$currentDate: ++ The correct number of username parameters have been passed and are equal to 1. ++" 2>&1 | tee >> "$scriptLog"
+    echo -e "$currentDate: -- Too many userName parameters have been passed --" 2>&1 | tee >> "$logFile"; return
+    else echo -e "$currentDate: ++ The correct number of userName parameters have been passed and are equal to 1. ++" 2>&1 | tee >> "$logFile"
     fi
    
     # check if the argument to the function call is constructed of only alphanumeric characters.  
     if [[ $1 = " "* ]] || [[ $1 =~ [^a-zA-Z0-9] ]]; then
-    echo -e "$currentDate: -- Please use valid characters as an argument parameter --" 2>&1 | tee >> "$scriptLog"; return;
-    else echo -e "$currentDate: ++ Only alphanumeric characters have been submitted as an argument parameter ++" 2>&1 | tee >> "$scriptLog"
+    echo -e "$currentDate: -- Please use valid characters as an argument parameter --" 2>&1 | tee >> "$logFile"; return;
+    else echo -e "$currentDate: ++ Only alphanumeric characters have been submitted as an argument parameter ++" 2>&1 | tee >> "$logFile"
     fi
     
     # check that script is run as root
-    if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$scriptLog"; exit 1; return; fi
+    if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$logFile"; exit 1; return; fi
     
-	# check if offset is valid
-    if [[ "$offset" -lt 0 ]] || [[ "$offset" -gt "$turning_point" ]]; then 
-    echo -e "${RED}-- Offset value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$scriptLog"
-    echo -e "Please change to a value less than $turning_point, preferably 200 or less and greater than zero." 2>&1 | tee >> "$scriptLog" exit 1; return; fi
+	# check if offset_uid is valid
+    if [[ "$offset_uid" -lt 0 ]] || [[ "$offset_uid" -gt "$turning_point" ]]; then 
+    echo -e "${RED}-- offset_uid value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$logFile"
+    echo -e "Please change to a value less than $turning_point, preferably 200 or less and greater than zero." 2>&1 | tee >> "$logFile" exit 1; return; fi
 
    
-    # verify username exists then get user's current id
-    result=$( user_name_exists "$unverified_user_name" )
+    # verify userName exists then get user's current id
+    result=$( userNameExists "$unverifiedUserName" )
    
     if [[ "$result" != "Yes" ]] ; then
-    echo -e "$currentDate: -- User \"$unverified_user_name\" does not exist --" 2>&1 | tee >> "$scriptLog"; return
+    echo -e "$currentDate: -- User \"$unverifiedUserName\" does not exist --" 2>&1 | tee >> "$logFile"; return
     fi
    
-    verified_user_name="$unverified_user_name";
+    verifiedUserName="$unverifiedUserName";
    
-    # check if verified_user_name is admin
-    result=$(isadmin "$verified_user_name")
+    # check if verifiedUserName is admin
+    result=$(isAdmin "$verifiedUserName")
     if [[ "$result" != "Yes" ]]; then
-    echo -e "$currentDate: -- User \"$verified_user_name\" is not an admin --" 2>&1 | tee >> "$scriptLog"; return
-    else echo -e "$currentDate: ++ User \"$verified_user_name\" is an admin ++" 2>&1 | tee >> "$scriptLog"
+    echo -e "$currentDate: -- User \"$verifiedUserName\" is not an admin --" 2>&1 | tee >> "$logFile"; return
+    else echo -e "$currentDate: ++ User \"$verifiedUserName\" is an admin ++" 2>&1 | tee >> "$logFile"
     fi
+    	
     # return "Yes" for all tests passed
     echo "Yes"
-    echo -e "$currentDate: + [Exit] function call: \"validate_user\" +" 2>&1 | tee >> "$scriptLog"; return
+    echo -e "$currentDate: ++ [Exit] function call: \"validateUser\" ++" 2>&1 | tee >> "$logFile"; return
     }
 
 #=======================================================================
-# requirements: global parameter "verified_user_name"
-# purpose: returns the "unadjusted_uid" aka the current uid of the "verified_user_name"
-get_user_uid() {
-    echo -e "$currentDate: + [Enter] function call: \"get_user_uid\" +" 2>&1 | tee >> "$scriptLog";
+# requirements: global parameter "verifiedUserName"
+# purpose: returns the "unadjusted_uid" aka the current uid of the "verifiedUserName"
+getUserUID() {
+    echo -e "$currentDate: ++ [Enter] function call: \"getUserUID\" ++" 2>&1 | tee >> "$logFile";
     # vars
     local uid
  
     # get uid
-    uid=$(dscl . -read "/Users/$verified_user_name" UniqueID | awk -F ' ' '{print $2}');
+    uid=$(dscl . -read "/Users/$verifiedUserName" UniqueID | awk -F ' ' '{print $2}');
     echo "$uid"
-    echo -e "$currentDate: + [Exit] function call: \"get_user_uid\" +" 2>&1 | tee >> "$scriptLog";
+    echo -e "$currentDate: ++ [Exit] function call: \"getUserUID\" ++" 2>&1 | tee >> "$logFile";
 }
 
 #=======================================================================
-# requirements: ƒ"uid_exists", global vars "unadjusted_uid","offset"
-# purpose: returns candidate uid in scope greater than turning_point in range of offset.
-find_adjusted_uid() {
-	echo -e "$currentDate: + [Enter] function call: \"find_readjusted_uid\" +" 2>&1 | tee >> "$scriptLog";
+# requirements: ƒ"uidExists", global vars "unadjusted_uid","offset_uid", "turning_point"
+# purpose: returns available adjusted uid.
+findAdjustedUID() {
+	echo -e "$currentDate: ++ [Enter] function call: \"findAdjustedUID\" ++" 2>&1 | tee >> "$logFile";
 	# vars #
-
 	local adjusted_uid 
-	# positive_offset
-	if [[ $offset -ge 0 ]]; then
+	
+	# positive_offset_uid
+	if [[ $offset_uid -ge 0 ]]; then
 		adjusted_uid="$(( turning_point + 1 ))"
 		while [[ "$unadjusted_uid" -le "$turning_point" ]]
 		do
 			# unadjusted_uid is less than or equal to the turning_point and needs to be incremented; "x(0)...->x(uid)<-...x(tp)...x(32k)" or "x(0)...->x(uid)=x(tp)<-...x(32k)"
-			echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point"
+			echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point" 2>&1 | tee >> "$logFile";
 
 			# satisfies 1st condition of being greater than the turning_point; "x(0)...x(tp)...->x(adj)<-...x(32k)"
-			if [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "Adjusted UID : $adjusted_uid is greater than turning_point : $turning_point"; uid_conflict=$( uid_exists "$adjusted_uid" );
+			if [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "Adjusted | UID : $adjusted_uid is greater than turning_point : $turning_point" 2>&1 | tee >> "$logFile"; uid_conflict=$( uidExists "$adjusted_uid" );
 
 			# satisfies 2nd condition of being less than or equal to the upper boundary; "x(0)...x(tp)...->x(adj)<-...x(32k) or x(0)...x(tp)......->x(adj)=x(32k)<-
-			if [[ "$adjusted_uid" -le "$upper" ]]; then echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper";						
+			if [[ "$adjusted_uid" -le "$upper" ]]; then echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper" 2>&1 | tee >> "$logFile";						
 
 			# if the adjusted uid is not in use, return the value, otherwise increment and try agin
-			if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
-			else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again"; (( adjusted_uid++ )); continue; fi
-			else echo -e "Adjusted UID is greater than $upper"; fi 
-			else echo -e "Adjusted UID is less than or equal to $turning_point"; fi
+			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: ++ [Exit] function call: \"findAdjustedUID\" ++" 2>&1 | tee >> "$logFile"; echo "$adjusted_uid"; return;
+			else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again" 2>&1 | tee >> "$logFile"; (( adjusted_uid++ )); continue; fi
+			else echo -e "Adjusted UID is greater than $upper" 2>&1 | tee >> "$logFile"; fi 
+			else echo -e "Adjusted UID is less than or equal to $turning_point" 2>&1 | tee >> "$logFile"; fi
 		done
 	fi
 
-	# negative_offset
-	if [[ $offset -lt 0 ]]; then
+	# negative_offset_uid, to change to offset_uid rule, simply modify adjusted_uid="$(( turning_point + offset_uid ))" and (( adjusted_uid++ ))
+	if [[ $offset_uid -lt 0 ]]; then
 	adjusted_uid="$(( turning_point ))"
 		while [[ "$unadjusted_uid" -gt "$turning_point" ]]
 		do
 			# unadjusted_uid is greater than the turning_point and needs to be decremented
-			echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point" 			
+			echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point" 2>&1 | tee >> "$logFile";			
 
 			# satisfies 1st condition of being less than or equal to the turning_point
-			if [[ "$adjusted_uid" -le "$turning_point" ]]; then
-			echo -e "Adjusted UID : $adjusted_uid is less than or equal to the turning_point : $turning_point"	
-			uid_conflict=$( uid_exists "$adjusted_uid" )
+			if [[ "$adjusted_uid" -le "$turning_point" ]]; then echo -e "Adjusted | UID : $adjusted_uid is less than or equal to the turning_point : $turning_point" 2>&1 | tee >> "$logFile"; uid_conflict=$( uidExists "$adjusted_uid" );
 	
 			# satisfies 2nd condition of being greater than or equal to the lower boundary
 			if [[ "$adjusted_uid" -ge "$lower" ]]; then
-			echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower"
+			echo -e "Adjusted UID: $adjusted_uid is greater than or equal to the Lower Boundary: $lower" 2>&1 | tee >> "$logFile";
 	
 			# if the adjusted uid is not in use, return the value, otherwise decrement and try agin
-			if [[ "$uid_conflict" != "Yes" ]]; then echo "$adjusted_uid"; return;
-			else echo -e "Adjusted UID: $adjusted_uid is in-use -> decrement the Adjusted UID and try again"; (( adjusted_uid-- )); continue; fi
-			else echo -e "Adjusted UID is less than $lower"; fi 
-			else echo -e "Adjusted UID is greater than $turning_point"; fi 
+			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: ++ [Exit] function call: \"findAdjustedUID\" ++" 2>&1 | tee >> "$logFile"; echo "$adjusted_uid"; return;
+			else echo -e "Adjusted UID: $adjusted_uid is in-use -> decrement the Adjusted UID and try again" 2>&1 | tee >> "$logFile"; (( adjusted_uid-- )); continue; fi
+			else echo -e "Adjusted UID is less than $lower" 2>&1 | tee >> "$logFile"; fi 
+			else echo -e "Adjusted UID is greater than $turning_point" 2>&1 | tee >> "$logFile"; fi 
 		done
 	fi
 }
 
-
 #=======================================================================
 # requirements: admin users with uid's set below turning_point 
 # purpose: modifies com.apple.loginwindow to hide admin users with uid's below turning_point
-hide_users() {
+hideUsers() {
 sudo defaults write /Library/Preferences/com.apple.loginwindow Hide500Users -bool YES
 }
 
 #=======================================================================
 # requirements: admin users with uid's below turning_point. 
-# purpose: reverts the hide_users change to com.apple.loginwindow.plist to restore uids to uid's above turning_point so that they can be properly handled as normal accounts.
-unhide_users() {
+# purpose: reverts the hideUsers change to com.apple.loginwindow.plist to restore uids to uid's above turning_point so that they can be properly handled as normal accounts.
+unhideUsers() {
     undo_hide500() { sudo defaults delete /Library/Preferences/com.apple.loginwindow Hide500Users; } 
     result=$(sudo defaults read /Library/Preferences/com.apple.loginwindow | grep Hide500Users)
     if [ -n "$result" ]; then undo_hide500; fi
 }
 
-#=======================================================================
-# requirements: ƒ"find_adjusted_uid", ƒ"migrate_uid_permissions", global vars "unadjusted_uid", "verified_user_name"
-# purpose: down-convert the "unadjusted_uid" and migrate the file permissions
-convert_user_uid() {
-	local adjusted_uid
-   
-    # calculate adjusted uid
-    adjusted_uid=$( find_readjusted_uid )
-	if [[ $adjusted_uid -eq $unadjusted_uid ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is already less than \"$turning_point\". No change to the UID is required! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	elif [[ "$adjusted_uid" -eq "-1" ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is \"undefined\". No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	elif [[ -z "$adjusted_uid" ]]; then
-	echo -e "- The UID: \"$unadjusted_uid\" is an \"un-handled\" condition. No change to the UID was made! -" 2>&1 | tee >> "$scriptLog"; exit; return
-	fi
-	
-    echo -e "Username : \"$verified_user_name\"\tUID : \"$unadjusted_uid\"\t Adjusted UID : \"$adjusted_uid\"" 2>&1 | tee >> "$scriptLog"
-
-	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
-	# step 1 - change the current uid to the proposed adjusted uid
-    #dscl . -change /Users/"$verified_user_name" UniqueID "$unadjusted_uid" "$adjusted_uid";
- 	
- 	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
-    #migrate_uid_permissions "$adjusted_uid"
-    
-    # step 3 - revert the Hide500Users changes to com.apple.loginwindow
-    # condition to hide users below turning_point
-    #hide_users
-}
 
 #=======================================================================
 # requirements: 
 # purpose: 
-revert_user_uid() {
-    local adjusted_uid
-   
+migrateUserUID() {
+	local adjusted_uid
+	
     # calculate adjusted uid
-    adjusted_uid=$( find_readjusted_uid )
-   
-    echo -e "Username : \"$verified_user_name\"\tUID : \"$unadjusted_uid\"\t: \"$adjusted_uid\"";
-
-    if [[ $unadjusted_uid -gt $turning_point ]] && [[  $adjusted_uid -lt $(( $turning_point + offset )) ]]; then
-    echo -e "$currentDate: +- UID already satisfies the range condition -+" 2>&1 | tee >> "$scriptLog"; return;
-    elif ! [[ $adjusted_uid -gt $turning_point ]] && ! [[  $adjusted_uid -lt $(( $turning_point + offset )) ]]; then
-    echo -e "$currentDate: ++ The adjusted UID: \"$adjusted_uid\" satisfies the range condition. The proposed UID adjustment satisfies all conditions. ++" 2>&1 | tee >> "$scriptLog"; return;
+    adjusted_uid=$( findAdjustedUID )
+	if [[ -z $adjusted_uid ]]; then echo "Adjusted UID [ NOT FOUND ]. Migration of UID aborted"; return;
+	else echo -e "Username : \"$verifiedUserName\" | UID : $unadjusted_uid -> $adjusted_uid"; fi
 
 	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
 	# step 1 - change the current uid to the proposed adjusted uid
-    #dscl . -change /Users/"$verified_user_name" UniqueID "$unadjusted_uid" "$adjusted_uid";
-    else echo -e "$currentDate: -- The adjusted UID failed to satisfy the range condition --" 2>&1 | tee >> "$scriptLog"; return;
-    fi
+    #dscl . -change /Users/"$verifiedUserName" UniqueID "$unadjusted_uid" "$adjusted_uid";
  	
  	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
-    #migrate_uid_permissions "$adjusted_uid"
+    #migrateUIDPermissions "$adjusted_uid"
     
     # step 3 - revert the Hide500Users changes to com.apple.loginwindow
     # condition to uhide users below $turning_point
-    #unhide_users
+    #unhideUsers
 }
 
 #=======================================================================
-# requirements: global vars "verified_user_name","unadjusted_uid", parameter"adjusted_uid" aka *new* current uid
+# requirements: global vars "verifiedUserName","unadjusted_uid", parameter"adjusted_uid" aka *new* current uid
 # purpose: to hand-off the ownership of links, files and directories of the "unadjusted_uid" to the "adjusted_uid"
-migrate_uid_permissions() {
-    echo -e "$currentDate: + [Enter] function call: \"migrate_uid_permissions\" +" 2>&1 | tee >> "$scriptLog";
+migrateUIDPermissions() {
+    echo -e "$currentDate: ++ [Enter] function call: \"migrateUIDPermissions\" ++" 2>&1 | tee >> "$logFile";
     local adjusted_uid
    
     adjusted_uid=$1
  
     # Change/restore ownership of user's files
-    find /Users/"$verified_user_name" -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
+    find /Users/"$verifiedUserName" -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     find /Library -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     find /Applications -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     find /usr -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     find /private/var/ -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
-    echo -e "$currentDate: + [Exit] function call: \"migrate_uid_permissions\" +" 2>&1 | tee >> "$scriptLog";
+    echo -e "$currentDate: ++ [Exit] function call: \"migrateUIDPermissions\" ++" 2>&1 | tee >> "$logFile";
     
     # find -xP / -user $unadjusted_uid -ls > -print0 | xargs -0 chown -hf "$adjusted_uid"
     # mv /.Trashes/$unadjusted_uid /.Trashes/$adjusted_uid
@@ -295,59 +257,64 @@ echo "$number" | awk ' { if($number>=0) { print $number } else { print $number*-
 #####################################
 ## Main
 #####################################
-#------------------------------------
-# Vars
+
+# vars
 #------------------------------------
 # Set color codes (See Reference [4]
 RED='\033[0;31m'
 GRN='\033[0;32m'
 YLW='\033[1;33m'
 NC='\033[0m'    # No Color
- 
-scriptLog="/var/log/hide_admin_user.log"    # Log file
-currentDate=$(date "+%a %b %d %I:%M:%S %p\$")
-FAIL="${RED}- Fail -${NC}"
-PASS="${GRN}- Success -${NC}"
-offset=
-unadjusted_uid=
-unverified_user_name=
-username=
-valid=
-verified_user_name=
+logFile="/var/log/hide_admin_user.log"    # Log file
+currentDate=$(date "+%a %b %d %I:%M:%S %p")
+FAIL="${RED}[X] FAIL${NC}"
+PASS="${GRN}[√] SUCCESS${NC}"
+# offset_uid=
+# unadjusted_uid=
+# unverifiedUserName=
+# userName=
+# valid=
+# verifiedUserName=
+# upper=
+# lower=
+# moveUID=
+# aboveTurningPoint=
+# belowTurningPoint=
 
 
-# Send stdout to "$scriptLog", and then stderr(2) to stdout(1)
-exec 1>> "$scriptLog" 2>&1
+# global vars
+#------------------------------------
+upper=32767
+lower=0
+aboveTurningPoint=1
+belowTurningPoint=-1
+turning_point=500
+userName=$1
+
+scriptName=$(basename "$0")
+
+# Send stdout to "$logFile", and then stderr(2) to stdout(1)
+#exec 1>> "$logFile" 2>&1
 echo -e "===================================================="
-echo -e "Script: $0"
+echo -e "Script:  $(basename "$0")	ver. ${version}"
 echo -e "Runtime: $currentDate"
 echo -e "===================================================="
- 
-username=$1
-valid="$( validate_user "$username" )"
-echo -e "Valid User - $valid"
-if [[ $valid != "Yes" ]]; then echo -e "Invalid Username. Please only use an \"Account name\" of a user with administrative privileges!"; exit; fi
+
+echo -e "Username: \"$userName\" ${YLW}[VERIFY]${NC}"
+valid="$( validateUser "$userName" )"
+if [[ "$valid" = "Yes" ]];then echo -e "$PASS"; else echo -e "$FAIL"; exit; fi
+verifiedUserName=$userName
+
+echo -e "Get Current User:\"$userName\" ${YLW}[UID]${NC}"
+unadjusted_uid=$( getUserUID $verifiedUserName )
+if ! [[ -z "$unadjusted_uid" ]]; then echo -e "$PASS"; else echo -e "$FAIL"; fi
+
+echo -e "Migrate User:\"$userName\" UID:\"$unadjusted_uid\""
+migrateUserUID
+if [[ $? -eq 0 ]]; then echo -e "$PASS"; echo -e "${GRN}- Admin User $user_name [NOT VISIBLE] -${NC}"; 
+else echo -e "$FAIL"; echo  -e "${RED}- User $user_name was [VISIBLE] -${NC}"; fi
 
 
-# 
-# # global vars
-offset=100;
-turning_point=500
-verified_user_name=$username
-# convert_user_uid
-# if [[ $? -eq 0 ]]; then
-# echo -e "${GRN}- Admin User $user_name, was hidden -${NC}"
-# else echo  -e "${RED}- User $user_name was not hidden -${NC}"
-# fi
-
-
-# revert_user_uid
-# if [[ $? -eq 0 ]]; then
-# echo -e "${GRN}- Admin User $user_name, was un-hidden -${NC}"
-# else echo  -e "${RED}- User $user_name was not un-hidden -${NC}"
-# fi
- 
-#unhide_users
 # Reference
 # [1]   https://stackoverflow.com/questions/1216922/sh-command-exec-21
 # [2]   https://unix.stackexchange.com/questions/183125/what-does-1-and-2-mean-in-a-bash-script
