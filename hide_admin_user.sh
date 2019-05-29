@@ -39,7 +39,7 @@ uidExists() {
     result="$(dscacheutil -q user | grep '^uid:' | grep -w "$unverified_uid" | awk -F ' ' '{print $2}' | head -1)"
     
     # if the result is not blank, then the uid exists
-    if [ -n "$result" ]; then echo "Yes"; else echo "No"; fi
+    if [ -n "$result" ]; then echo "Yes"; else errormsg+=("uidExists() -> UID does not exist"); echo "No"; fi
     echo -e "$currentDate: ++ [Exit] function call: \"uidExists\" ++" 2>&1 | tee >> "$logFile";
 }
  
@@ -51,12 +51,12 @@ isAdmin() {
     local result
  
     result=$(id -Gn "$1" | grep -w -o admin;)
-    if ! [[ "$result" != "admin" ]]; then echo "Yes"; else echo "No";fi
+    if ! [[ "$result" != "admin" ]]; then echo "Yes"; else errormsg+=("isAdmin() -> User is not an \"Admin\"."); echo "No";fi
     echo -e "$currentDate: ++ [Exit] function call: \"isAdmin\" ++" 2>&1 | tee >> "$logFile";
 }
 
 #=======================================================================
-# requirements: ƒ"userNameExists",ƒ"is_admin", unverified userName parameter
+# requirements: ƒ"userNameExists",ƒ"isAdmin", unverified userName parameter
 # purpose: validates global variable "verifiedUserName"
 validateUser() {
     echo -e "$currentDate: ++ [Enter] function call: \"validateUser\" ++" 2>&1 | tee >> "$logFile"
@@ -67,35 +67,29 @@ validateUser() {
 
     # check if the one parameter and only parameter was provided as an argument to the function call
     if (( $# < 1 )); then
-    echo -e "$currentDate: -- userName parameter is zero length. --" 2>&1 | tee >> "$logFile"; exit 1; return
+    echo -e "$currentDate: -- userName parameter is zero length. --" 2>&1 | tee >> "$logFile"; errormsg+=("validateUser() -> Username is \"<blank>\"."); return
     else echo -e "$currentDate: ++ userName parameter is at least greater than or equal to 1. ++" 2>&1 | tee >> "$logFile"
     fi
     
     if (( $# > 1 ));  then
-    echo -e "$currentDate: -- Too many userName parameters have been passed --" 2>&1 | tee >> "$logFile"; return
+    echo -e "$currentDate: -- Too many userName parameters have been passed --" 2>&1 | tee >> "$logFile"; errormsg+=("validateUser() -> Username is not a valid shortname."); return
     else echo -e "$currentDate: ++ The correct number of userName parameters have been passed and are equal to 1. ++" 2>&1 | tee >> "$logFile"
     fi
    
     # check if the argument to the function call is constructed of only alphanumeric characters.  
     if [[ $1 = " "* ]] || [[ $1 =~ [^a-zA-Z0-9] ]]; then
-    echo -e "$currentDate: -- Please use valid characters as an argument parameter --" 2>&1 | tee >> "$logFile"; return;
+    echo -e "$currentDate: -- Please use valid characters as an argument parameter --" 2>&1 | tee >> "$logFile"; errormsg+=("validateUser() -> Username contains non-alphanumeric characters."); return;
     else echo -e "$currentDate: ++ Only alphanumeric characters have been submitted as an argument parameter ++" 2>&1 | tee >> "$logFile"
     fi
     
     # check that script is run as root
-    if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$logFile"; exit 1; return; fi
-    
-	# check if offset_uid is valid
-    if [[ "$offset_uid" -lt 0 ]] || [[ "$offset_uid" -gt "$turning_point" ]]; then 
-    echo -e "${RED}-- offset_uid value is set to a value that is out of range --${NC}" 2>&1 | tee >> "$logFile"
-    echo -e "Please change to a value less than $turning_point, preferably 200 or less and greater than zero." 2>&1 | tee >> "$logFile" exit 1; return; fi
-
+    if [[ $( id -u -r ) -ne 0 ]]; then echo -e "${RED}- This script must be run as root! -${NC}" 2>&1 | tee >> "$logFile"; errormsg+=("validateUser() -> Script is not run as \"root\"."); return; fi
    
     # verify userName exists then get user's current id
-    result=$( userNameExists "$unverifiedUserName" )
+    result=$( userNameExists "$unverifiedUserName")
    
     if [[ "$result" != "Yes" ]] ; then
-    echo -e "$currentDate: -- User \"$unverifiedUserName\" does not exist --" 2>&1 | tee >> "$logFile"; return
+    echo -e "$currentDate: -- User \"$unverifiedUserName\" does not exist --" 2>&1 | tee >> "$logFile"; errormsg+=("validateUser() -> Username does not exist.");return
     fi
    
     verifiedUserName="$unverifiedUserName";
@@ -103,12 +97,13 @@ validateUser() {
     # check if verifiedUserName is admin
     result=$(isAdmin "$verifiedUserName")
     if [[ "$result" != "Yes" ]]; then
+    errormsg+=("validateUser() -> User is not an \"Admin\".");
     echo -e "$currentDate: -- User \"$verifiedUserName\" is not an admin --" 2>&1 | tee >> "$logFile"; return
     else echo -e "$currentDate: ++ User \"$verifiedUserName\" is an admin ++" 2>&1 | tee >> "$logFile"
     fi
     	
-    # return "Yes" for all tests passed
-    echo "Yes"
+    # set global userValid flag as  "TRUE" for all tests passed
+    userValid=TRUE
     echo -e "$currentDate: ++ [Exit] function call: \"validateUser\" ++" 2>&1 | tee >> "$logFile"; return
     }
 
@@ -127,15 +122,15 @@ getUserUID() {
 }
 
 #=======================================================================
-# requirements: ƒ"uidExists", global vars "unadjusted_uid","offset_uid", "turning_point"
+# requirements: ƒ"uidExists", global vars "unadjusted_uid","objective", "turning_point"
 # purpose: returns available adjusted uid.
 findAdjustedUID() {
 	echo -e "$currentDate: ++ [Enter] function call: \"findAdjustedUID\" ++" 2>&1 | tee >> "$logFile";
 	# vars #
 	local adjusted_uid 
 	
-	# positive_offset_uid
-	if [[ $offset_uid -ge 0 ]]; then
+	# positive offset uid
+	if [[ $objective = "showUser" ]]; then
 		adjusted_uid="$(( turning_point + 1 ))"
 		while [[ "$unadjusted_uid" -le "$turning_point" ]]
 		do
@@ -143,7 +138,7 @@ findAdjustedUID() {
 			echo -e "Unadjusted UID : $unadjusted_uid is less than or equal to turning_point : $turning_point" 2>&1 | tee >> "$logFile";
 
 			# satisfies 1st condition of being greater than the turning_point; "x(0)...x(tp)...->x(adj)<-...x(32k)"
-			if [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "Adjusted | UID : $adjusted_uid is greater than turning_point : $turning_point" 2>&1 | tee >> "$logFile"; uid_conflict=$( uidExists "$adjusted_uid" );
+			if [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "Adjusted | UID : $adjusted_uid is greater than turning_point : $turning_point" 2>&1 | tee >> "$logFile"; uid_conflict=$( uidExists "$adjusted_uid");
 
 			# satisfies 2nd condition of being less than or equal to the upper boundary; "x(0)...x(tp)...->x(adj)<-...x(32k) or x(0)...x(tp)......->x(adj)=x(32k)<-
 			if [[ "$adjusted_uid" -le "$upper" ]]; then echo -e "Adjusted UID: $adjusted_uid is less than Upper Boundary: $upper" 2>&1 | tee >> "$logFile";						
@@ -151,13 +146,17 @@ findAdjustedUID() {
 			# if the adjusted uid is not in use, return the value, otherwise increment and try agin
 			if [[ "$uid_conflict" != "Yes" ]]; then echo -e "$currentDate: ++ [Exit] function call: \"findAdjustedUID\" ++" 2>&1 | tee >> "$logFile"; echo "$adjusted_uid"; return;
 			else echo -e "Adjusted UID: $adjusted_uid is in-use -> Increment the Adjusted UID and try again" 2>&1 | tee >> "$logFile"; (( adjusted_uid++ )); continue; fi
-			else echo -e "Adjusted UID is greater than $upper" 2>&1 | tee >> "$logFile"; fi 
-			else echo -e "Adjusted UID is less than or equal to $turning_point" 2>&1 | tee >> "$logFile"; fi
+			else 
+				errormsg+=("findAdjustedUID() -> Adjusted UID is greater than \"$upper\".");
+				echo -e "Adjusted UID is greater than $upper" 2>&1 | tee >> "$logFile"; fi 
+			else 
+				errormsg+=("findAdjustedUID() -> Adjusted UID is less than or equal to \"$turning_point\".");
+				echo -e "Adjusted UID is less than or equal to $turning_point" 2>&1 | tee >> "$logFile"; fi
 		done
 	fi
 
-	# negative_offset_uid, to change to offset_uid rule, simply modify adjusted_uid="$(( turning_point + offset_uid ))" and (( adjusted_uid++ ))
-	if [[ $offset_uid -lt 0 ]]; then
+	# negative offset uid, to change to objective rule, simply modify adjusted_uid="$(( turning_point + objective ))" and (( adjusted_uid++ ))
+	if [[ $objective = "hideUser" ]]; then
 	adjusted_uid="$(( turning_point ))"
 		while [[ "$unadjusted_uid" -gt "$turning_point" ]]
 		do
@@ -165,7 +164,7 @@ findAdjustedUID() {
 			echo -e "Unadjusted UID : $unadjusted_uid is greater than the turning_point : $turning_point" 2>&1 | tee >> "$logFile";			
 
 			# satisfies 1st condition of being less than or equal to the turning_point
-			if [[ "$adjusted_uid" -le "$turning_point" ]]; then echo -e "Adjusted | UID : $adjusted_uid is less than or equal to the turning_point : $turning_point" 2>&1 | tee >> "$logFile"; uid_conflict=$( uidExists "$adjusted_uid" );
+			if [[ "$adjusted_uid" -le "$turning_point" ]]; then echo -e "Adjusted | UID : $adjusted_uid is less than or equal to the turning_point : $turning_point" 2>&1 | tee >> "$logFile"; uid_conflict=$( uidExists "$adjusted_uid");
 	
 			# satisfies 2nd condition of being greater than or equal to the lower boundary
 			if [[ "$adjusted_uid" -ge "$lower" ]]; then
@@ -201,8 +200,6 @@ unhideUsers() {
 # requirements: 
 # purpose: 
 migrateUserUID() {
-	local adjusted_uid
-	
     # calculate adjusted uid
     adjusted_uid=$( findAdjustedUID )
 	if [[ -z $adjusted_uid ]]; then echo "Adjusted UID [ NOT FOUND ]. Migration of UID aborted"; return;
@@ -217,6 +214,7 @@ migrateUserUID() {
     
     # step 3 - revert the Hide500Users changes to com.apple.loginwindow
     # condition to uhide users below $turning_point
+    ######if [[ $objective ?????
     #unhideUsers
 }
 
@@ -253,7 +251,72 @@ number=$1
 echo "$number" | awk ' { if($number>=0) { print $number } else { print $number*-1 } }'
 }
 
+finish() {
+local testUID
+testUID=$(getUserUID "$userName")
+if [[ -n $adjusted_uid ]] && [[ -n $testUID ]]; then 
+	echo -e "${YLW}[Expected]->\t${NC} $userName:$unadjusted_uid -> $adjusted_uid"
+	echo -e "${YLW}[Result]->\t${NC} $userName:$unadjusted_uid -> $testUID"
+	if [[ "$objective" = "showUser" ]]; then
+		if [[ "$adjusted_uid" -eq "$testUID" ]] && [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "$PASS"; echo -e "${GRN}- Admin User $userName [VISIBLE] -${NC}"; 
+		else echo -e "$FAIL"; echo  -e "${RED}- User \"$userName\":$testUID migration [FAILED] -${NC}"; 
+		fi
+	elif [[ $objective = "hideUser" ]]; then
+		if [[ $adjusted_uid -eq $testUID ]] && [[ $adjusted_uid -le $turning_point ]]; then 
+		echo -e "$PASS"; echo -e "${GRN}- Admin User $userName [NOT VISIBLE] -${NC}"; 
+		else echo -e "$FAIL"; echo  -e "${RED}- User \"$userName\":$testUID migration [FAILED] -${NC}"; 
+		fi
+	fi
+fi
+
+if [[ -n "${errormsg[$*]}" ]]; then
+	echo -e "${YLW}--------------------------------------------------${NC}"
+	echo -e "${YLW}- Error Messages                                 -${NC}"
+	echo -e "${YLW}--------------------------------------------------${NC}"
+	i=0;
+	for message in "${errormsg[@]}"; do
+	echo -e "${YLW}$((++i)). $message ${NC}"
+	done
+fi
+
+}
 #=======================================================================
+# requirements: 
+# purpose: 
+mainScript() {
+
+############## Begin Script Here ###################
+####################################################
+# Send stdout to "$logFile", and then stderr(2) to stdout(1)
+#exec 1>> "$logFile" 2>&1
+echo -e "===================================================="
+echo -e "Script:  $scriptName	ver. ${version}"
+echo -e "Runtime: $currentDate" 
+echo -e "[$globalCount] Input -> Username: \"$userName\""
+echo -e "===================================================="
+
+echo -e "${YLW}[VERIFY]${NC} Username: \"$userName\""
+validateUser "$userName"
+if [[ $userValid = "TRUE" ]];then echo -e "$PASS -> \"$userName\""; else errormsg+=("mainScript() -> Username is invalid."); echo -e "$FAIL"; finish; return; fi
+verifiedUserName=$userName
+
+echo -e "${YLW}[Get UID]${NC} \"$userName\""
+unadjusted_uid=$( getUserUID "$verifiedUserName" )
+if [[ -n "$unadjusted_uid" ]]; then echo -e "$PASS -> $unadjusted_uid"; else errormsg+=("mainScript() -> UID could not be found."); echo -e "$FAIL"; fi
+
+echo -e "Migrate User:\"$userName\" UID:\"$unadjusted_uid\""
+migrateUserUID
+finish
+####################################################
+############### End Script Here ####################
+}
+
+resetVars(){
+	errormsg=()
+	adjusted_uid=
+	userValid=FALSE;
+}
+
 #####################################
 ## Main
 #####################################
@@ -269,95 +332,30 @@ logFile="/var/log/hide_admin_user.log"    # Log file
 currentDate=$(date "+%a %b %d %I:%M:%S %p")
 FAIL="${RED}[X] FAIL${NC}"
 PASS="${GRN}[√] SUCCESS${NC}"
-# offset_uid=
-# unadjusted_uid=
-# unverifiedUserName=
-# userName=
-# valid=
-# verifiedUserName=
-# upper=
-# lower=
-# moveUID=
-# aboveTurningPoint=
-# belowTurningPoint=
-
 
 # global vars
 #------------------------------------
 upper=32767
 lower=0
-aboveTurningPoint=1
-belowTurningPoint=-1
 turning_point=500
-userName=$1
-
+globalCount=0
 scriptName=$(basename "$0")
+userNamearr=("testadmins" "testadmin" "teststandard")
 
-# Send stdout to "$logFile", and then stderr(2) to stdout(1)
-#exec 1>> "$logFile" 2>&1
-echo -e "===================================================="
-echo -e "Script:  $(basename "$0")	ver. ${version}"
-echo -e "Runtime: $currentDate"
-echo -e "===================================================="
+#userName="testadmin"
+#objective="showUser"
+objective="hideUser"
+echo -e "${GRN}####################################################${NC}"
+for user in "${userNamearr[@]}"; do
+((++globalCount))
+resetVars
+userName=$user
+mainScript
+done
 
-echo -e "Username: \"$userName\" ${YLW}[VERIFY]${NC}"
-valid="$( validateUser "$userName" )"
-if [[ "$valid" = "Yes" ]];then echo -e "$PASS"; else echo -e "$FAIL"; exit; fi
-verifiedUserName=$userName
-
-echo -e "Get Current User:\"$userName\" ${YLW}[UID]${NC}"
-unadjusted_uid=$( getUserUID $verifiedUserName )
-if ! [[ -z "$unadjusted_uid" ]]; then echo -e "$PASS"; else echo -e "$FAIL"; fi
-
-echo -e "Migrate User:\"$userName\" UID:\"$unadjusted_uid\""
-migrateUserUID
-if [[ $? -eq 0 ]]; then echo -e "$PASS"; echo -e "${GRN}- Admin User $user_name [NOT VISIBLE] -${NC}"; 
-else echo -e "$FAIL"; echo  -e "${RED}- User $user_name was [VISIBLE] -${NC}"; fi
-
+# it seems that errors that don't get logged to errormsg are in seperate shells invoked using 
+# $( function call ). These can be undone by not calling them this way and instead have them 
+# change global values as output
 
 # Reference
-# [1]   https://stackoverflow.com/questions/1216922/sh-command-exec-21
-# [2]   https://unix.stackexchange.com/questions/183125/what-does-1-and-2-mean-in-a-bash-script
-# [3]   https://www.inteller.net/notes/change-user-id-on-snow-leopard
-# [4] ### Colors ###
-# Black    0;30    Dark Gray    1;30
-# Red    0;31    Light Red    1;31
-# Green    0;32    Light Green   1;32
-# Brown/Orange 0;33    Yellow    1;33
-# Blue    0;34    Light Blue    1;34
-# Purple    0;35    Light Purple  1;35
-# Cyan    0;36    Light Cyan    1;36
-# Light Gray   0;37    White    1;37
-# if cond; then op1; else op2; fi
-# [5]   https://apple.stackexchange.com/questions/98775/how-do-you-change-your-uid-in-os-x-mountain-lion
-# sudo find / -uid 501
-# sudo find / -uid $unadjusted_uid -exec chown -hf $adjusted_uid {} \;
-# [6]   https://unix.stackexchange.com/questions/155551/how-to-debug-a-bash-script
-# [7]   https://unix.stackexchange.com/questions/145651/using-exec-and-tee-to-redirect-logs-to-stdout-and-a-log-file-in-the-same-time
-# [8]   https://www.gnu.org/software/bash/manual/bashref.html#Process-Substitution
-# [9]   https://www.gnu.org/software/bash/manual/bashref.html#Redirecting-Standard-Output-and-Standard-Error
-# [10]  https://www.gnu.org/software/bash/manual/bashref.html#index-exec
-# [11]  https://bash.cyberciti.biz/guide/Perform_arithmetic_operations
- 
-# 1>> and 2>> are redirections for specific file-descriptors, in this case:
-# standard output   (file descriptor 1)
-# standard error    (file descriptor 2)
-# see Reference [1] & [2]
- 
-# The symbols \< and \> respectively match the empty string at the beginning and end
-# of a word. This script grep's in this fashion to eliminate partial matches.
-# grep -w <word> or  grep -nr '\<word\>'
-
-# Continuously monitor log file command
-# sudo tail -f /var/log/hide_admin_user.log  
-
-# offset	uid							requirements
-# pos		less than turning point		(offset+uid)>tp & (offset+uid)<=32767
-# 			equal to turning point		(offset+uid)>tp & (offset+uid)<=32767
-# 			greater than turning point	no change required
-# neg		less than turning point		no change required
-# 			equal to turning point		no change required
-# 			greater than turning point	(offset+tp)>=0 & (offset+uid) < tp
-# zero		less than turning point		no change
-# 			equal to turning point		no change
-# 			greater than turning point	no change
+# [1] https://stackoverflow.com/questions/6047648/bash-4-associative-arrays-error-declare-a-invalid-option
