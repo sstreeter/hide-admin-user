@@ -203,19 +203,28 @@ migrateUserUID() {
     # calculate adjusted uid
     adjusted_uid=$( findAdjustedUID )
 	if [[ -z $adjusted_uid ]]; then echo "Adjusted UID [ NOT FOUND ]. Migration of UID aborted"; return;
-	else echo -e "Username : \"$verifiedUserName\" | UID : $unadjusted_uid -> $adjusted_uid"; fi
+	else echo -e "${YLW}[Proposal]:${NC}\t \"$verifiedUserName\":$unadjusted_uid -> $adjusted_uid"; fi
 
+ 	if [[ -n $adjusted_uid ]] && [[ -n $unadjusted_uid ]]; then 
+ 	
 	## This next command step initiates a 3 step chain of commands which must complete or the user will be in a corrupt state	
 	# step 1 - change the current uid to the proposed adjusted uid
-    #dscl . -change /Users/"$verifiedUserName" UniqueID "$unadjusted_uid" "$adjusted_uid";
+    dscl . -change /Users/"$verifiedUserName" UniqueID "$unadjusted_uid" "$adjusted_uid";
  	
  	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
-    #migrateUIDPermissions "$adjusted_uid"
+   	migrateUIDPermissions "$adjusted_uid"
     
-    # step 3 - revert the Hide500Users changes to com.apple.loginwindow
-    # condition to uhide users below $turning_point
-    ######if [[ $objective ?????
-    #unhideUsers
+		# step 3 - set preferences 
+		# 			showUser - revert the Hide500Users changes to com.apple.loginwindow
+		#			hideUser - modifies com.apple.loginwindow to hide admin users with uid's below the turning_point
+		# condition to unhide users below $turning_point
+		if [[ $objective = "showUser" ]]; then
+		unhideUsers
+		else
+		# condition to hide users below $turning_point
+		hideUsers
+		fi
+	fi
 }
 
 #=======================================================================
@@ -232,14 +241,14 @@ migrateUIDPermissions() {
     find /Library -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     find /Applications -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     find /usr -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
-    find /private/var/ -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
+    # Following directory likely protected by System Integrity Protection (SIP). You will need to do terminal cmd "csrutil disable" on command-R reboot
+    #find /private/var/ -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     echo -e "$currentDate: ++ [Exit] function call: \"migrateUIDPermissions\" ++" 2>&1 | tee >> "$logFile";
     
     # find -xP / -user $unadjusted_uid -ls > -print0 | xargs -0 chown -hf "$adjusted_uid"
     # mv /.Trashes/$unadjusted_uid /.Trashes/$adjusted_uid
     # find -xL / -name "*$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
-    
-    #https://www.inteller.net/notes/change-user-id-on-snow-leopard
+
 }
 
 #=======================================================================
@@ -255,8 +264,8 @@ finish() {
 local testUID
 testUID=$(getUserUID "$userName")
 if [[ -n $adjusted_uid ]] && [[ -n $testUID ]]; then 
-	echo -e "${YLW}[Expected]->\t${NC} $userName:$unadjusted_uid -> $adjusted_uid"
-	echo -e "${YLW}[Result]->\t${NC} $userName:$unadjusted_uid -> $testUID"
+	echo -e "${YLW}[Expected]->\t${NC} \"$userName\":$unadjusted_uid -> $adjusted_uid"
+	echo -e "${YLW}[Result]->\t${NC} \"$userName\":$unadjusted_uid -> $testUID"
 	if [[ "$objective" = "showUser" ]]; then
 		if [[ "$adjusted_uid" -eq "$testUID" ]] && [[ "$adjusted_uid" -gt "$turning_point" ]]; then echo -e "$PASS"; echo -e "${GRN}- Admin User $userName [VISIBLE] -${NC}"; 
 		else echo -e "$FAIL"; echo  -e "${RED}- User \"$userName\":$testUID migration [FAILED] -${NC}"; 
@@ -292,19 +301,19 @@ mainScript() {
 echo -e "===================================================="
 echo -e "Script:  $scriptName	ver. ${version}"
 echo -e "Runtime: $currentDate" 
-echo -e "[$globalCount] Input -> Username: \"$userName\""
+echo -e "[$globalCount] Objective: $objective -> \"$userName\""
 echo -e "===================================================="
 
-echo -e "${YLW}[VERIFY]${NC} Username: \"$userName\""
+echo -e "${YLW}[VERIFY]${NC}\t Username: \"$userName\""
 validateUser "$userName"
-if [[ $userValid = "TRUE" ]];then echo -e "$PASS -> \"$userName\""; else errormsg+=("mainScript() -> Username is invalid."); echo -e "$FAIL"; finish; return; fi
+if [[ $userValid = "TRUE" ]];then echo -e "$PASS ->\t \"$userName\""; else errormsg+=("mainScript() -> Username is invalid."); echo -e "$FAIL"; finish; return; fi
 verifiedUserName=$userName
 
-echo -e "${YLW}[Get UID]${NC} \"$userName\""
+echo -e "${YLW}[Get UID]${NC}\t \"$userName\""
 unadjusted_uid=$( getUserUID "$verifiedUserName" )
-if [[ -n "$unadjusted_uid" ]]; then echo -e "$PASS -> $unadjusted_uid"; else errormsg+=("mainScript() -> UID could not be found."); echo -e "$FAIL"; fi
+if [[ -n "$unadjusted_uid" ]]; then echo -e "$PASS ->\t $unadjusted_uid"; else errormsg+=("mainScript() -> UID could not be found."); echo -e "$FAIL"; fi
 
-echo -e "Migrate User:\"$userName\" UID:\"$unadjusted_uid\""
+echo -e "${YLW}[Target]:${NC}\t \"$userName\":$unadjusted_uid"
 migrateUserUID
 finish
 ####################################################
@@ -312,8 +321,9 @@ finish
 }
 
 resetVars(){
-	errormsg=()
 	adjusted_uid=
+	errormsg=()
+	unadjusted_uid=
 	userValid=FALSE;
 }
 
@@ -340,11 +350,11 @@ lower=0
 turning_point=500
 globalCount=0
 scriptName=$(basename "$0")
-userNamearr=("testadmins" "testadmin" "teststandard")
+userNamearr=("testadmin" "testadmin1" "testadmin2")
 
 #userName="testadmin"
-#objective="showUser"
-objective="hideUser"
+objective="showUser"
+#objective="hideUser"
 echo -e "${GRN}####################################################${NC}"
 for user in "${userNamearr[@]}"; do
 ((++globalCount))
@@ -353,9 +363,6 @@ userName=$user
 mainScript
 done
 
-# it seems that errors that don't get logged to errormsg are in seperate shells invoked using 
-# $( function call ). These can be undone by not calling them this way and instead have them 
-# change global values as output
-
 # Reference
 # [1] https://stackoverflow.com/questions/6047648/bash-4-associative-arrays-error-declare-a-invalid-option
+# [2] https://www.inteller.net/notes/change-user-id-on-snow-leopard
