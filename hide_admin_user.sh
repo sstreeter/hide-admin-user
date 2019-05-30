@@ -353,8 +353,8 @@ scriptName=$(basename "$0")
 userNamearr=("testadmin" "testadmin1" "testadmin2")
 
 #userName="testadmin"
-objective="showUser"
-#objective="hideUser"
+#objective="showUser"
+objective="hideUser"
 echo -e "${GRN}####################################################${NC}"
 for user in "${userNamearr[@]}"; do
 ((++globalCount))
