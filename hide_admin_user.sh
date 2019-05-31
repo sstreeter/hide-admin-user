@@ -5,9 +5,9 @@
 version="1.0"              
 # About:    Changes UID of admin user account and hides it.
 #=======================================================================
-#####################################
+####################################################
 # functions
-#####################################
+####################################################
 #=======================================================================
 # requirements: unverified userName parameter
 # purpose: verifies userName argument exists
@@ -21,7 +21,7 @@ userNameExists() {
     result=$(dscl . -list /Users | grep -w "$unverifiedUserName";)
     if [[ -n "$result" ]]; then echo "Yes"; else echo "No";fi
 }
- 
+
 #=======================================================================
 # requirements: unverified uid parameter	
 # purpose: checks if uid argument has already been issued.
@@ -55,7 +55,7 @@ validateUser() {
     local unverifiedUserName
     unverifiedUserName=$1
 
-    # check if the one parameter and only parameter was provided as an argument to the function call
+    # check if one parameter was provided as an argument to the function call
     if (( $# < 1 )); then
     errormsg+=("validateUser() -> Username is \"<blank>\"."); return
     fi
@@ -65,7 +65,9 @@ validateUser() {
     fi
    
     # check if the argument to the function call is constructed of only alphanumeric characters.  
-    if [[ $1 = " "* ]] || [[ $1 =~ [^a-zA-Z0-9] ]]; then
+    if [[ $1 = *" "* ]]; then
+    errormsg+=("validateUser() -> Username contains a space \" \" character."); return;
+    elif [[ $1 =~ [^a-zA-Z0-9] ]]; then
 	errormsg+=("validateUser() -> Username contains non-alphanumeric characters."); return;
     fi
     
@@ -206,7 +208,6 @@ migrateUserUID() {
 # requirements: global vars "verifiedUserName","unadjusted_uid", parameter"adjusted_uid" aka *new* current uid
 # purpose: to hand-off the ownership of links, files and directories of the "unadjusted_uid" to the "adjusted_uid"
 migrateUIDPermissions() {
- 
     # Change/restore ownership of user's files
     find /Users/"$verifiedUserName" -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
     find /Library -user "$unadjusted_uid" -print0 | xargs -0 chown -hf "$adjusted_uid"
@@ -273,8 +274,6 @@ resetVars(){
 # requirements: $userName
 # purpose: Starts script, validates username, extrapolates UID, requests adjusted uid, and migrates the user.
 mainScript() {
-############## Begin Script Here ###################
-####################################################
 # Send stdout to "$logFile", and then stderr(2) to stdout(1)
 #exec 1>> "$logFile" 2>&1
 echo -e "===================================================="
@@ -299,13 +298,11 @@ if [[ -n "$unadjusted_uid" ]]; then echo -e "$PASS ->\t $unadjusted_uid"; else e
 echo -e "${YLW}[Target]:${NC}\t \"$userName\":$unadjusted_uid"
 migrateUserUID
 finish
-####################################################
-############### End Script Here ####################
 }
 
-#####################################
+####################################################
 ## Main
-#####################################
+####################################################
 
 # vars
 #------------------------------------
@@ -326,13 +323,19 @@ turning_point=500
 globalCount=0
 scriptName=$(basename "$0")
 
+####################################################
+################## Change Here ####E################
+### -> Change these userNamearr to usernames of admins you want to hide. <-- ###
 userNamearr=("testadmin" "testadmin1" "testadmin2")
-
-objective="showUser"
-#objective="hideUser"
+### -> Change objective to either "showUser" or "hideUser" admin account. <-- ###
+#objective="showUser"
+objective="hideUser"
+####################################################
+####################################################
+clear
 echo -e "${GRN}####################################################${NC}"
 for user in "${userNamearr[@]}"; do
-((++globalCount))
+((++globalCount)) # count used to delineate each user being migrated.
 resetVars
 userName=$user
 mainScript
