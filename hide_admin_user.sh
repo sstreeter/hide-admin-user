@@ -66,9 +66,9 @@ validateUser() {
    
     # check if the argument to the function call is constructed of only alphanumeric characters.  
     if [[ $1 = *" "* ]]; then
-    errormsg+=("validateUser() -> Username contains a space \" \" character."); return;
+    errormsg+=("validateUser() -> Username contains one or more space \" \" characters."); return;
     elif [[ $1 =~ [^a-zA-Z0-9] ]]; then
-	errormsg+=("validateUser() -> Username contains non-alphanumeric characters."); return;
+	errormsg+=("validateUser() -> Username contains one or more non-alphanumeric characters."); return;
     fi
     
     # check that script is run as root
@@ -174,12 +174,13 @@ unhideUsers() {
 }
 
 #=======================================================================
-# requirements: 
-# purpose: 
+# requirements: ƒ"findAdjustedUID()", ƒ"migrateUIDPermissions()", ƒ"unhideUsers", ƒ"hideUsers"; 
+#				global vars - "$adjusted_uid", "$unadjusted_uid", "$verifiedUserName"
+# purpose: migrate the user id to the turning point condition that satisfies "hideUser" or "showUser"
 migrateUserUID() {
     # calculate adjusted uid
     findAdjustedUID
-	if [[ -z $adjusted_uid ]]; then echo "Adjusted UID [ NOT FOUND ]. Migration of UID aborted"; return;
+	if [[ -z $adjusted_uid ]]; then echo -e "${RED}Adjusted UID [ NOT FOUND ]. Migration of UID aborted!${NC}"; return;
 	else echo -e "${YLW}[Proposal]:${NC}\t \"$verifiedUserName\":$unadjusted_uid -> $adjusted_uid"; fi
 
  	if [[ -n $adjusted_uid ]] && [[ -n $unadjusted_uid ]]; then 
@@ -191,9 +192,10 @@ migrateUserUID() {
  	# step 2 - migrate owner permissions from current uid to proposed uid. This step makes significant changes, and represents the PoNR aka point of no return
    	migrateUIDPermissions
     
-		# step 3 - set preferences 
-		# 			showUser - revert the Hide500Users changes to com.apple.loginwindow
-		#			hideUser - modifies com.apple.loginwindow to hide admin users with uid's below the turning_point
+		# step 3 - change com.apple.loginwindow plist file 
+		# showUser - revert the Hide500Users changes to com.apple.loginwindow
+		# hideUser - modifies com.apple.loginwindow to hide admin users with uid's below the turning_point
+		
 		# condition to unhide users below $turning_point
 		if [[ $objective = "showUser" ]]; then
 		unhideUsers
@@ -228,7 +230,11 @@ echo "$number" | awk ' { if($number>=0) { print $number } else { print $number*-
 
 #=======================================================================
 # requirements: $adjusted_uid, $unadjusted_uid, $userName, turning_point
-# purpose: Summarizes expected, final result output and displays errors, if any.
+# purpose: Summarizes expected, final result output and displays errors, if any. Note that 
+#		   this method of error tracking does not work for result=$(<function call>) because 
+#		   arrays local by default in bash 3.2 and calling a function this way opens a separate shell.
+#		   In a future version I plan to revert back to logging errors to a file and then read 
+#          those errors back to the console or to the same errormsg array I've created.
 finish() {
 local testUID
 testUID=$(getUserUID "$userName")
@@ -241,7 +247,7 @@ if [[ -n $adjusted_uid ]] && [[ -n $testUID ]]; then
 		fi
 	elif [[ $objective = "hideUser" ]]; then
 		if [[ $adjusted_uid -eq $testUID ]] && [[ $adjusted_uid -le $turning_point ]]; then 
-		echo -e "$PASS"; echo -e "${GRN}- Admin User $userName [NOT VISIBLE] -${NC}"; 
+		echo -e "$PASS"; echo -e "${GRN}- Admin User $userName [HIDDEN] -${NC}"; 
 		else echo -e "$FAIL"; echo  -e "${RED}- User \"$userName\":$testUID migration [FAILED] -${NC}"; 
 		fi
 	fi
